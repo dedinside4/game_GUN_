@@ -38,7 +38,7 @@ class Ball:
         self.color = choice(GAME_COLORS)
         self.live = 30
         self.gy = 0.15
-
+        self.killtime=pygame.time.get_ticks()+230000
     def move(self):
         """Переместить мяч по прошествии единицы времени.
 
@@ -64,11 +64,15 @@ class Ball:
             self.vy*=-0.5
             if abs(self.vy)<0.5:
                 self.vy=0
+                self.gy=0
+                self.killtime=pygame.time.get_ticks()
         if self.y<self.r:
             self.y = self.r
             self.vy*=-0.5
             if abs(self.vy)<0.5:
+                self.killtime=pygame.time.get_ticks()
                 self.vy=0
+                self.gy=0
         self.vy -= self.gy
     def draw(self):
         pygame.draw.circle(
@@ -90,7 +94,9 @@ class Ball:
         if (obj.x-self.x)**2+(obj.y-self.y)**2<=(self.r + obj.r)**2:
             collision=True
         return collision
-
+    def do_you_want_to_die(self):
+        if pygame.time.get_ticks()-self.killtime>=3000:
+            balls.remove(self)
 
 class Gun:
     def __init__(self, screen, x=20, y=450):
@@ -165,10 +171,26 @@ class Target:
         self.x = rnd(600, 780)
         self.y = rnd(300, 550)
         self.r = rnd(2, 50)
+        self.vx = rnd(-5,5)
+        self.vy = rnd(-5,5)
         self.color = RED
         self.points = 0
         self.live = 1
-    
+    def move(self):
+        self.x += self.vx
+        self.y += self.vy
+        if self.x>WIDTH - self.r:
+            self.x = WIDTH - self.r
+            self.vx*=-1
+        if self.x<self.r:
+            self.x = self.r
+            self.vx*=-1
+        if self.y>HEIGHT - self.r:
+            self.y = HEIGHT - self.r
+            self.vy*=-1
+        if self.y<self.r:
+            self.y = self.r
+            self.vy*=-1
     def hit(self, points=1):
         """Попадание шарика в цель."""
         self.points += points
@@ -191,6 +213,7 @@ targets.append(target)
 finished = False
 winner = False
 total_count = 0
+shot_count = 0
 while not finished:
     screen.fill(WHITE)
     gun.draw()
@@ -204,9 +227,9 @@ while not finished:
     draw_text(f'{total_count}',(10,10),18)  
     pygame.display.update()
     if done:
-        count=len(balls)
         balls = []
-        draw_text(f'Вы уничтожили цель за {count} выстрелов!',(400,300),18)
+        draw_text(f'Вы уничтожили цель за {shot_count} выстрелов!',(400,300),18)
+        shot_count = 0
         pygame.display.update()
         pygame.time.delay(1000)
         done=False
@@ -220,9 +243,18 @@ while not finished:
             gun.fire2_start(event)
         elif event.type == pygame.MOUSEBUTTONUP:
             gun.fire2_end(event)
+            shot_count+=1
         elif event.type == pygame.MOUSEMOTION:
             gun.targetting(event)
+    for target in targets:
+        target.move()
+        for b in balls:
+            if b.hittest(target) and target.live:
+                target.live = 0
+                total_count += 1
+                target.hit()
     for b in balls:
+        b.do_you_want_to_die()
         b.move()
         for target in targets:
             if b.hittest(target) and target.live:
