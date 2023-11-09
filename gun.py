@@ -168,7 +168,7 @@ class Target:
         self.color = RED
         self.points = 0
         self.live = 1
-
+    
     def hit(self, points=1):
         """Попадание шарика в цель."""
         self.points += points
@@ -181,28 +181,37 @@ pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 bullet = 0
 balls = []
-
+targets = []
 clock = pygame.time.Clock()
 gun = Gun(screen)
 target = Target()
+targets.append(target)
+target = Target()
+targets.append(target)
 finished = False
 winner = False
 total_count = 0
 while not finished:
     screen.fill(WHITE)
     gun.draw()
-    if not winner:
-        target.draw()
+    done=True
+    for target in targets:
+        if target.live:
+            target.draw()
+            done=False
     for b in balls:
         b.draw()
-    draw_text(f'{total_count}',(10,10),18)
-    if winner:
-        draw_text(f'Вы уничтожили цель за {count} выстрелов!',(400,300),18)
-        if pygame.time.get_ticks() - win_time>=3000:
-            winner = False
-            target.new_target()
+    draw_text(f'{total_count}',(10,10),18)  
     pygame.display.update()
-
+    if done:
+        count=len(balls)
+        balls = []
+        draw_text(f'Вы уничтожили цель за {count} выстрелов!',(400,300),18)
+        pygame.display.update()
+        pygame.time.delay(1000)
+        done=False
+        for target in targets:
+            target.new_target()
     clock.tick(FPS)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -215,14 +224,11 @@ while not finished:
             gun.targetting(event)
     for b in balls:
         b.move()
-        if b.hittest(target) and target.live:
-            count = len(balls)
-            balls = []
-            target.live = 0
-            total_count += 1
-            target.hit()
-            winner=True
-            win_time=pygame.time.get_ticks()
+        for target in targets:
+            if b.hittest(target) and target.live:
+                target.live = 0
+                total_count += 1
+                target.hit()
     gun.power_up()
 
 pygame.quit()
