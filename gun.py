@@ -4,7 +4,7 @@ import random
 import pygame
 
 
-FPS = 30
+FPS = 120
 
 RED = 0xFF0000
 BLUE = 0x0000FF
@@ -37,7 +37,7 @@ class Ball:
         self.vy = 0
         self.color = choice(GAME_COLORS)
         self.live = 30
-        self.gy = 0.4
+        self.gy = 0.15
 
     def move(self):
         """Переместить мяч по прошествии единицы времени.
@@ -49,23 +49,23 @@ class Ball:
         # FIXME
         self.x += self.vx
         self.y -= self.vy
-        if self.x>800:
-            self.x = 800
+        if self.x>WIDTH - self.r:
+            self.x = WIDTH - self.r
             self.vx*=-0.5
             if abs(self.vx)<0.5:
                 self.vx=0
-        if self.x<0:
-            self.x = 0
+        if self.x<self.r:
+            self.x = self.r
             self.vx*=-0.5
             if abs(self.vx)<0.5:
                 self.vx=0
-        if self.y>600:
-            self.y = 600
+        if self.y>HEIGHT - self.r:
+            self.y = HEIGHT - self.r
             self.vy*=-0.5
             if abs(self.vy)<0.5:
                 self.vy=0
-        if self.y<0:
-            self.y = 0
+        if self.y<self.r:
+            self.y = self.r
             self.vy*=-0.5
             if abs(self.vy)<0.5:
                 self.vy=0
@@ -93,7 +93,7 @@ class Ball:
 
 
 class Gun:
-    def __init__(self, screen, x=40, y=450):
+    def __init__(self, screen, x=20, y=450):
         self.screen = screen
         self.f2_power = 10
         self.f2_on = 0
@@ -116,8 +116,8 @@ class Gun:
         new_ball = Ball(self.screen)
         new_ball.r += 5
         self.an = math.atan2((event.pos[1]-new_ball.y), (event.pos[0]-new_ball.x))
-        new_ball.vx = self.f2_power * math.cos(self.an)
-        new_ball.vy = - self.f2_power * math.sin(self.an)
+        new_ball.vx = self.f2_power * math.cos(self.an)/4
+        new_ball.vy = - self.f2_power * math.sin(self.an)/4
         balls.append(new_ball)
         self.f2_on = 0
         self.f2_power = 10
@@ -125,7 +125,10 @@ class Gun:
     def targetting(self, event):
         """Прицеливание. Зависит от положения мыши."""
         if event:
-            self.an = math.atan((event.pos[1]-450) / (event.pos[0]-20))
+            try:
+                self.an = math.atan((event.pos[1]-450) / (event.pos[0]-20))
+            except:
+                self.an = -math.pi/2
         if self.f2_on:
             self.color = RED
         else:
@@ -137,7 +140,7 @@ class Gun:
     def power_up(self):
         if self.f2_on:
             if self.f2_power < 100:
-                self.f2_power += 1
+                self.f2_power += 0.5
             self.color = RED
         else:
             self.color = GREY
