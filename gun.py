@@ -52,23 +52,27 @@ class Ball:
         if self.x>WIDTH - self.r:
             self.x = WIDTH - self.r
             self.vx*=-0.5
+            self.vy*=0.9
             if abs(self.vx)<0.5:
                 self.vx=0
         if self.x<self.r:
             self.x = self.r
             self.vx*=-0.5
+            self.vy*=0.9
             if abs(self.vx)<0.5:
                 self.vx=0
-        if self.y>HEIGHT - self.r:
+        if self.y>=HEIGHT - self.r:
             self.y = HEIGHT - self.r
             self.vy*=-0.5
-            if abs(self.vy)<0.5:
+            self.vx*=0.9
+            if abs(self.vy)<0.5 and self.gy>0:
                 self.vy=0
                 self.gy=0
                 self.killtime=pygame.time.get_ticks()
         if self.y<self.r:
             self.y = self.r
             self.vy*=-0.5
+            self.vx*=0.9
             if abs(self.vy)<0.5:
                 self.killtime=pygame.time.get_ticks()
                 self.vy=0
