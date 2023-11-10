@@ -99,7 +99,7 @@ class Ball:
             collision=True
         return collision
     def do_you_want_to_die(self):
-        if pygame.time.get_ticks()-self.killtime>=3000:
+        if pygame.time.get_ticks()-self.killtime>=1000:
             balls.remove(self)
 
 class Gun:
