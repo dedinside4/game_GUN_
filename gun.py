@@ -6,7 +6,7 @@ import pygame
 
 FPS = 120
 
-RED = 0xFF0000
+RED = (255,0,0)
 BLUE = 0x0000FF
 YELLOW = 0xFFC91F
 GREEN = 0x00FF00
@@ -14,7 +14,8 @@ MAGENTA = 0xFF03B8
 CYAN = 0x00FFCC
 BLACK = (0, 0, 0)
 WHITE = 0xFFFFFF
-GREY = 0x7D7D7D
+GREY = (125,125,125)
+print(GREY,RED)
 GAME_COLORS = [RED, BLUE, YELLOW, GREEN, MAGENTA, CYAN]
 
 WIDTH = 700
@@ -116,11 +117,13 @@ class Gun:
         self.x = x
         self.y = y-self.bottom
         self.rect = pygame.Rect(self.x-self.left,self.y,2*self.left,self.bottom)
-        self.color = BLACK
         self.v1 = WIDTH/(FPS*1.3)
         self.v2 = self.v1*0.4
         self.v = 0
         self.tank_color = GREY
+        self.cooldown=False
+        self.cooldown_time=5000
+        self.last_shot=-230000
     def fire2_start(self, event):
         self.f2_on = 1
         self.color = YELLOW
@@ -140,7 +143,9 @@ class Gun:
         balls.append(new_ball)
         self.f2_on = 0
         self.f2_power = WIDTH/60
-
+        self.cooldown=True
+        self.last_shot=pygame.time.get_ticks()
+        gunshot_normal_sound.play()
     def targetting(self, event):
         """Прицеливание. Зависит от положения мыши."""
         try:
@@ -149,8 +154,6 @@ class Gun:
             self.an = -math.pi/2
         if self.f2_on:
             self.color = RED
-        else:
-            self.color = GREY
     def draw(self):
         # FIXIT don't know how to do it
         self.rect = pygame.Rect(self.x-self.left,self.y,2*self.left,self.bottom)
@@ -161,8 +164,6 @@ class Gun:
             if self.f2_power < WIDTH/20:
                 self.f2_power += WIDTH/(60*FPS*1)
             self.color = RED
-        else:
-            self.color = GREY
     def move(self):
         keystate=pygame.key.get_pressed()
         if keystate[pygame.K_LSHIFT]:
@@ -180,6 +181,16 @@ class Gun:
             self.x=self.left
         elif self.x>WIDTH-self.right:
             self.x=WIDTH-self.right
+    def cooling(self):
+        if self.cooldown:
+            if pygame.time.get_ticks() - self.last_shot>=self.cooldown_time:
+                self.color = GREY
+                self.cooldown = False
+            else:
+                k = (pygame.time.get_ticks() - self.last_shot)/self.cooldown_time
+                r1,g1,b1=RED
+                r2,g2,b2=GREY
+                self.color = (r1+k*(r2-r1),g1+k*(g2-g1),b1+k*(b2-b1))
 class Target:
     def __init__(self):
         self.points = 0
@@ -235,6 +246,7 @@ def end_music():
     pygame.mixer.music.unload()
 pygame.init()
 pygame.mixer.init()
+gunshot_normal_sound=pygame.mixer.Sound('normal_shot.mp3')
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 bullet = 0
 balls = []
@@ -277,9 +289,9 @@ while not finished:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             finished = True
-        elif event.type == pygame.MOUSEBUTTONDOWN:
+        elif event.type == pygame.MOUSEBUTTONDOWN and not gun.cooldown:
             gun.fire2_start(event)
-        elif event.type == pygame.MOUSEBUTTONUP:
+        elif event.type == pygame.MOUSEBUTTONUP and gun.f2_on:
             gun.fire2_end(event)
             shot_count+=1
     for target in targets:
@@ -299,6 +311,7 @@ while not finished:
                 target.hit()
     gun.move()
     gun.targetting(list(pygame.mouse.get_pos()))
+    gun.cooling()
     gun.power_up()
 
 pygame.quit()
