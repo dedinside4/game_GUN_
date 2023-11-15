@@ -331,7 +331,7 @@ def next_boss(number):
     try:
         x,y,r=boss[number]
         targets.append(Boss(x,y,r))
-        set_music(boss_music[number])
+        #set_music(boss_music[number])
     except:
         game_over()
 font_name=pygame.font.match_font('arial')
@@ -364,7 +364,7 @@ bullet = 0
 balls = []
 bullets = []
 targets = []
-boss_music = 6*['March_of_the_Defenders.mp3']
+boss_music = []
 boss = 6*[(WIDTH/2,HEIGHT*1/5,WIDTH/10)]
 
 clock = pygame.time.Clock()
@@ -393,7 +393,7 @@ while not finished:
     draw_text(f'{total_count}',(10,10),18)  
     pygame.display.update()
     if done:
-        end_music()
+        #end_music()
         balls = []
         draw_text(f'Вы уничтожили цель за {shot_count} выстрелов!',(WIDTH/2,HEIGHT/2),WIDTH//39)
         shot_count = 0
