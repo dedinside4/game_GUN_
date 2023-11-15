@@ -17,8 +17,8 @@ WHITE = 0xFFFFFF
 GREY = 0x7D7D7D
 GAME_COLORS = [RED, BLUE, YELLOW, GREEN, MAGENTA, CYAN]
 
-WIDTH = 800
-HEIGHT = 600
+WIDTH = 700
+HEIGHT = 760
 
 
 class Ball:
@@ -32,12 +32,12 @@ class Ball:
         self.screen = screen
         self.x = x
         self.y = y
-        self.r = 10
+        self.r = 4
         self.vx = 0
         self.vy = 0
         self.color = choice(GAME_COLORS)
         self.live = 30
-        self.gy = 0.15
+        self.gy = -0.15
         self.killtime=pygame.time.get_ticks()+230000
     def move(self):
         """Переместить мяч по прошествии единицы времени.
@@ -48,7 +48,7 @@ class Ball:
         """
         # FIXME
         self.x += self.vx
-        self.y -= self.vy
+        self.y += self.vy
         if self.x>WIDTH - self.r:
             self.x = WIDTH - self.r
             self.vx*=-0.5
@@ -65,7 +65,7 @@ class Ball:
             self.y = HEIGHT - self.r
             self.vy*=-0.5
             self.vx*=0.9
-            if abs(self.vy)<0.5 and self.gy>0:
+            if abs(self.vy)<0.5 and self.gy<0:
                 self.vy=0
                 self.gy=0
                 self.killtime=pygame.time.get_ticks()
@@ -99,19 +99,28 @@ class Ball:
             collision=True
         return collision
     def do_you_want_to_die(self):
-        if pygame.time.get_ticks()-self.killtime>=1000:
+        if pygame.time.get_ticks()-self.killtime>=300:
             balls.remove(self)
 
 class Gun:
-    def __init__(self, screen, x=20, y=450):
+    def __init__(self, screen, x=WIDTH/2, y=HEIGHT):
         self.screen = screen
-        self.f2_power = 10
+        self.f2_power = WIDTH/60
         self.f2_on = 0
-        self.an = 1
+        self.an = 0
         self.color = GREY
+        self.bottom=WIDTH/20
+        self.top=WIDTH/30
+        self.left=WIDTH/20
+        self.right=self.left
         self.x = x
-        self.y = y
+        self.y = y-self.bottom
+        self.rect = pygame.Rect(self.x-self.left,self.y,2*self.left,self.bottom)
         self.color = BLACK
+        self.v1 = WIDTH/(FPS*1.3)
+        self.v2 = self.v1*0.4
+        self.v = 0
+        self.tank_color = GREY
     def fire2_start(self, event):
         self.f2_on = 1
         self.color = YELLOW
@@ -123,46 +132,54 @@ class Gun:
         """
         global balls, bullet
         bullet += 1
-        new_ball = Ball(self.screen)
+        new_ball = Ball(self.screen,self.x,self.y)
         new_ball.r += 5
-        self.an = math.atan2((event.pos[1]-new_ball.y), (event.pos[0]-new_ball.x))
-        new_ball.vx = self.f2_power * math.cos(self.an)/4
-        new_ball.vy = - self.f2_power * math.sin(self.an)/4
+        #self.an = math.atan2((event.pos[0] - new_ball.x), (new_ball.y - event.pos[1]))
+        new_ball.vx = self.f2_power * math.sin(self.an)*0.7+self.v
+        new_ball.vy = - self.f2_power * math.cos(self.an)*0.7
         balls.append(new_ball)
         self.f2_on = 0
-        self.f2_power = 10
+        self.f2_power = WIDTH/60
 
     def targetting(self, event):
         """Прицеливание. Зависит от положения мыши."""
-        if event:
-            try:
-                self.an = math.atan((event.pos[1]-450) / (event.pos[0]-20))
-            except:
-                self.an = -math.pi/2
+        try:
+            self.an = math.atan2((event[0] - self.x), (self.y - event[1]))
+        except:
+            self.an = -math.pi/2
         if self.f2_on:
             self.color = RED
         else:
             self.color = GREY
-
-    def draw(self,):
+    def draw(self):
         # FIXIT don't know how to do it
-        pygame.draw.line(screen, self.color, (self.x,self.y),(self.x+math.cos(self.an)*self.f2_power,self.y+math.sin(self.an)*self.f2_power), width=5)
+        self.rect = pygame.Rect(self.x-self.left,self.y,2*self.left,self.bottom)
+        pygame.draw.line(screen, self.color, (self.x,self.y),(self.x+math.sin(self.an)*self.f2_power,self.y-math.cos(self.an)*self.f2_power), width=5)
+        pygame.draw.ellipse(screen, self.tank_color, self.rect)
     def power_up(self):
         if self.f2_on:
-            if self.f2_power < 100:
-                self.f2_power += 0.5
+            if self.f2_power < WIDTH/20:
+                self.f2_power += WIDTH/(60*FPS*1)
             self.color = RED
         else:
             self.color = GREY
-font_name=pygame.font.match_font('arial')
-def draw_text(text,c,size,color=(0,0,0)):
-    font=pygame.font.Font(pygame.font.match_font('arial'),size)
-    text_surface=font.render(text,True,color)
-    text_rect=text_surface.get_rect()
-    text_rect.center=c
-    screen.blit(text_surface,text_rect)
-def rnd(x,y):
-    return random.randint(x,y)
+    def move(self):
+        keystate=pygame.key.get_pressed()
+        if keystate[pygame.K_LSHIFT]:
+            v=self.v2
+        else:
+            v=self.v1
+        if keystate[pygame.K_a]:
+            self.v=-v
+        elif keystate[pygame.K_d]:
+            self.v=v
+        else:
+            self.v=0
+        self.x+=self.v
+        if self.x<self.left:
+            self.x=self.left
+        elif self.x>WIDTH-self.right:
+            self.x=WIDTH-self.right
 class Target:
     def __init__(self):
         self.points = 0
@@ -171,7 +188,7 @@ class Target:
         self.new_target()
 
     def new_target(self):
-        """ Инициализация новой цели. """
+        """ Инициализация новой цели."""
         self.x = rnd(600, 780)
         self.y = rnd(300, 550)
         self.r = rnd(2, 50)
@@ -180,6 +197,7 @@ class Target:
         self.color = RED
         self.points = 0
         self.live = 1
+        
     def move(self):
         self.x += self.vx
         self.y += self.vy
@@ -201,9 +219,22 @@ class Target:
 
     def draw(self):
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.r)
-
-
+font_name=pygame.font.match_font('arial')
+def draw_text(text,c,size,color=(0,0,0)):
+    font=pygame.font.Font(pygame.font.match_font('arial'),size)
+    text_surface=font.render(text,True,color)
+    text_rect=text_surface.get_rect()
+    text_rect.center=c
+    screen.blit(text_surface,text_rect)
+def rnd(x,y):
+    return random.randint(x,y)
+def set_music(track):
+    pygame.mixer.music.load(track)
+    pygame.mixer.music.play(loops=-1)
+def end_music():
+    pygame.mixer.music.unload()
 pygame.init()
+pygame.mixer.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 bullet = 0
 balls = []
@@ -237,8 +268,11 @@ while not finished:
         pygame.display.update()
         pygame.time.delay(1000)
         done=False
-        for target in targets:
-            target.new_target()
+        if total_count%20==0:
+            next_boss(total_count//20)
+        else:
+            for target in targets:
+                target.new_target()
     clock.tick(FPS)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -248,8 +282,6 @@ while not finished:
         elif event.type == pygame.MOUSEBUTTONUP:
             gun.fire2_end(event)
             shot_count+=1
-        elif event.type == pygame.MOUSEMOTION:
-            gun.targetting(event)
     for target in targets:
         target.move()
         for b in balls:
@@ -265,6 +297,8 @@ while not finished:
                 target.live = 0
                 total_count += 1
                 target.hit()
+    gun.move()
+    gun.targetting(list(pygame.mouse.get_pos()))
     gun.power_up()
 
 pygame.quit()
