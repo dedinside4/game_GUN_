@@ -113,8 +113,8 @@ class Stick:
         self.vx=v * math.sin(self.an)+v1
         self.vy = - v * math.cos(self.an)
         self.color = choice(GAME_COLORS)
-        self.mindamage = 0.0035
-        self.maxdamage = 0.0045
+        self.mindamage = 0.0045
+        self.maxdamage = 0.0055
         self.live=1
         self.killtime=pygame.time.get_ticks()+230000
     def move(self):
@@ -241,15 +241,10 @@ class Gun:
         gunshot_normal_sound.play()
         self.fire_type=None
     def fire3_end(self):
-        new_stick = Stick(self.x,self.y,self.an,self.f2_power*2,self.v)
-        balls.append(new_stick)
-        self.f2_on = 0
-        self.f2_power = WIDTH/60
         self.cooldown=True
-        self.cooldown_time=7000
+        self.cooldown_time=7000+1537
         self.last_shot=pygame.time.get_ticks()
-        gunshot_normal_sound.play()
-        self.fire_type=None
+        gunshot_stick_sound.play()
     def targetting(self, event):
         """Прицеливание. Зависит от положения мыши."""
         try:
@@ -265,8 +260,15 @@ class Gun:
         pygame.draw.ellipse(screen, self.tank_color, self.rect)
     def power_up(self):
         if self.f2_on:
-            if self.f2_power < WIDTH/20:
+            if self.f2_power < WIDTH/20 and not self.cooldown:
                 self.f2_power += WIDTH/(60*FPS*1)
+            elif self.cooldown and pygame.time.get_ticks()- self.last_shot>=1537:
+                new_stick = Stick(self.x,self.y,self.an,self.f2_power*2,self.v)
+                balls.append(new_stick)
+                self.f2_on = 0
+                self.f2_power = WIDTH/60
+                self.fire_type=None
+                gunshot_stick_sound.fadeout(5151)
             self.color = RED
     def get_hit(self):
         if pygame.time.get_ticks()-self.got_invincible>=self.invincible_time:
@@ -426,7 +428,7 @@ class Boss1(Boss):
             exec('self.'+self.pull[self.order]+'()')
             self.order+=1
         except:
-            pass
+            self.live=0
     def attack_1(self):
         self.live=50
         self.max_live=50
@@ -448,7 +450,8 @@ class Boss1(Boss):
     
 class AttackPattern1:
     def __init__(self,x,y,r,period,count1,count2,v,size):
-        self.last_shot=pygame.time.get_ticks()
+        self.first_delay=2000
+        self.last_shot=pygame.time.get_ticks()+self.first_delay
         self.delay=period*1000
         self.v=v
         self.count=random.randint(count1,count2)
@@ -508,6 +511,8 @@ def game_over():
 pygame.init()
 pygame.mixer.init()
 gunshot_normal_sound=pygame.mixer.Sound('normal_shot.mp3')
+gunshot_stick_sound=pygame.mixer.Sound('railgun_shot.mp3')
+gunshot_normal_sound.set_volume(0.8)
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 bullet = 0
 balls = []
@@ -559,6 +564,7 @@ while not finished:
         else:
             for target in targets:
                 if type(target) is type(eval(f'Boss{boss_number}()')):
+                    boss_number+=1
                     targets.remove(target)
                 else:
                     target.new_target()
