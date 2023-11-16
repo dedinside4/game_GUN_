@@ -38,6 +38,8 @@ class Ball:
         self.live = 1
         self.gy = -0.15
         self.killtime=pygame.time.get_ticks()+230000
+        self.mindamage = 15
+        self.maxdamage = 20
     def move(self):
         """Переместить мяч по прошествии единицы времени.
 
@@ -129,6 +131,7 @@ class Gun:
         self.continues=0
         self.b=float(root_scalar(self.find_ellipse, bracket=[0, self.left]).root)
         self.hitbox=None
+        self.fire_type=None
     def get_rect(self):
         self.rect = pygame.Rect(self.x-self.left,self.y,2*self.left,self.bottom)
         #pygame.draw.rect(screen,RED,self.rect)
@@ -148,15 +151,20 @@ class Gun:
         c=math.sqrt(a1**2-b1**2)
         f=math.sqrt(b2**2+(k*b2-c)**2)+math.sqrt(b2**2+(k*b2+c)**2)-2*k*b1
         return f
-    def fire2_start(self, event):
+    def fire_start(self, event):
+        if self.fire_type is None:
+            if event.button==1:
+                self.fire1_start()
+                self.fire_type=1
+                #self.f2_on = 1
+                #self.color = YELLOW
+    def fire_end(self, event):
+        if event.button==self.fire_type:
+            exec(f'self.fire{event.button}_end()')
+    def fire1_start(self):
         self.f2_on = 1
         self.color = YELLOW
-    def fire2_end(self, event):
-        """Выстрел мячом.
-
-        Происходит при отпускании кнопки мыши.
-        Начальные значения компонент скорости мяча vx и vy зависят от положения мыши.
-        """
+    def fire1_end(self):
         global balls
         new_ball = Ball(self.screen,self.x,self.y)
         new_ball.r += 5
@@ -169,6 +177,7 @@ class Gun:
         self.cooldown=True
         self.last_shot=pygame.time.get_ticks()
         gunshot_normal_sound.play()
+        self.fire_type=None
     def targetting(self, event):
         """Прицеливание. Зависит от положения мыши."""
         try:
@@ -288,7 +297,7 @@ class Bullet:
         self.x+=self.vx
         self.y+=self.vy
 class CircleBullet1(Bullet):
-    def __init__(self,vx,vy,x,y,r=8):
+    def __init__(self,vx,vy,x,y,r=HEIGHT/100):
         Bullet.__init__(self,vx,vy,x,y)
         self.r=r
         self.color=RED
@@ -313,44 +322,90 @@ class Boss:
         self.y=y
         self.r=r
         self.color=RED
-        self.live=4
+        self.live=None
+        self.attack_pattern=None
+        self.max_live=None
+        #self.pattern=1
     def draw(self):
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.r)
     def move(self):
         pass
     def hit(self,ball):
-        self.live-=1
+        self.live-=random.randint(ball.mindamage,ball.maxdamage)
         balls.remove(ball)
-        print(self.live)
+        if self.live<=0:
+            self.next_attack()      
+class Boss1(Boss):
+    def __init__(self,x=WIDTH/2,y=HEIGHT*1/5,r=WIDTH/10):
+        Boss.__init__(self,x,y,r)
+        self.pull=['attack_1','spellcard_1','attack_2','spellcard_2']
+        self.order=0
+        self.attack_pattern=None
     def attack(self):
-        AttackPattern1.activate(self.x,self.y,WIDTH/8)  
+        self.attack_pattern.activate()
+    def next_attack(self):
+        try:
+            exec('self.'+self.pull[self.order]+'()')
+            self.order+=1
+        except:
+            pass
+    def attack_1(self):
+        self.live=50
+        self.max_live=50
+        self.attack_pattern=AttackPattern1(self.x,self.y,WIDTH/8,1,35,45,7,HEIGHT/100)
+    def spellcard_1(self):
+        self.live=50
+        self.max_live=50
+        self.attack_pattern=AttackPattern1(self.x,self.y,WIDTH/8,0.3,20,25,4,HEIGHT/100)
+    def attack_2(self):
+        self.live=50
+        self.max_live=50
+        self.attack_pattern=AttackPattern1(self.x,self.y,WIDTH/8,1.3,7,10,5,HEIGHT/20)
+    def spellcard_2(self):
+        self.live=50
+        self.max_live=50
+        self.attack_pattern=AttackPattern1(self.x,self.y,WIDTH/8,0.8,10,15,5,HEIGHT/40)
+        
+        
+    
 class AttackPattern1:
-    last_shot=pygame.time.get_ticks()
-    delay=1000
-    v=7
-    count=random.randint(35,45)
-    phase=random.random()
-    def activate(x,y,r):
-        if pygame.time.get_ticks() - AttackPattern1.last_shot>=AttackPattern1.delay:
-            AttackPattern1.phase=random.random()*2*math.pi/AttackPattern1.count
-            AttackPattern1.scatter(x,y,r)
-            AttackPattern1.last_shot=pygame.time.get_ticks()
-    def scatter(x,y,r):
+    def __init__(self,x,y,r,period,count1,count2,v,size):
+        self.last_shot=pygame.time.get_ticks()
+        self.delay=period*1000
+        self.v=v
+        self.count=random.randint(count1,count2)
+        self.phase=random.random()*2*math.pi/self.count
+        self.x=x
+        self.y=y
+        self.r=r
+        self.size=size
+    def activate(self):
+        if pygame.time.get_ticks() - self.last_shot>=self.delay:
+            self.phase=random.random()*2*math.pi/self.count
+            self.scatter()
+            self.last_shot=pygame.time.get_ticks()
+    def scatter(self):
         global bullets
-        for i in range(0,AttackPattern1.count):
-            angle=i*2*math.pi/AttackPattern1.count+AttackPattern1.phase
-            x1=x+math.sin(angle)*r
-            y1=y-math.cos(angle)*r
-            bullets.append(CircleBullet1(AttackPattern1.v*math.sin(angle),-math.cos(angle)*AttackPattern1.v,x1,y1))
+        for i in range(0,self.count):
+            angle=i*2*math.pi/self.count+self.phase
+            x1=self.x+math.sin(angle)*self.r
+            y1=self.y-math.cos(angle)*self.r
+            bullets.append(CircleBullet1(self.v*math.sin(angle),-math.cos(angle)*self.v,x1,y1,self.size))
             
 def next_boss(number):
     try:
-        x,y,r=boss[number]
-        targets.append(Boss(x,y,r))
+        print(number)
+        b=eval('Boss'+str(number)+'()')
+        b.next_attack()
+        targets.append(b)
         #set_music(boss_music[number])
     except:
         game_over()
 font_name=pygame.font.match_font('arial')
+def draw_health_bar(boss):
+    k=max(0,boss.live/boss.max_live)
+    pygame.draw.line(screen, BLACK, (WIDTH/60,HEIGHT/30),(WIDTH-WIDTH/60,HEIGHT/30), width=5)
+    pygame.draw.line(screen, RED, (WIDTH/60,HEIGHT/30),(WIDTH/60+(WIDTH-WIDTH/30)*k,HEIGHT/30), width=5)
 def draw_text(text,c,size,color=(0,0,0)):
     font=pygame.font.Font(pygame.font.match_font('arial'),size)
     text_surface=font.render(text,True,color)
@@ -394,6 +449,7 @@ winner = False
 total_count = 0
 shot_count = 0
 next1=0
+boss_number=1
 while not finished:
     screen.fill(WHITE)
     gun.draw()
@@ -403,6 +459,8 @@ while not finished:
         if target.live:
             target.draw()
             done=False
+        if type(target)==type(eval(f'Boss{boss_number}()')):
+            draw_health_bar(target)
     for bullet in bullets:
         bullet.draw()
     for b in balls:
@@ -418,11 +476,11 @@ while not finished:
         pygame.time.delay(1000)
         done=False
         if next1%2==0:
-            next_boss(next1//2-1)
+            next_boss(boss_number)
             next1+=1
         else:
             for target in targets:
-                if type(target) is type(Boss()):
+                if type(target) is type(eval(f'Boss{boss_number}()')):
                     targets.remove(target)
                 else:
                     target.new_target()
@@ -432,9 +490,9 @@ while not finished:
         if event.type == pygame.QUIT:
             finished = True
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button==1 and not gun.cooldown:
-            gun.fire2_start(event)
+            gun.fire_start(event)
         elif event.type == pygame.MOUSEBUTTONUP and gun.f2_on:
-            gun.fire2_end(event)
+            gun.fire_end(event)
             shot_count+=1
     for target in targets:
         target.move()
