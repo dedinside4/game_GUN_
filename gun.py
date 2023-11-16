@@ -255,9 +255,16 @@ class Gun:
             self.color = RED
     def draw(self):
         # FIXIT don't know how to do it
-        self.get_rect()
-        pygame.draw.line(screen, self.color, (self.x,self.y),(self.x+math.sin(self.an)*self.f2_power,self.y-math.cos(self.an)*self.f2_power), width=5)
-        pygame.draw.ellipse(screen, self.tank_color, self.rect)
+        if not self.invincible:
+            self.get_rect()
+            pygame.draw.line(screen, self.color, (self.x,self.y),(self.x+math.sin(self.an)*self.f2_power,self.y-math.cos(self.an)*self.f2_power), width=5)
+            pygame.draw.ellipse(screen, self.tank_color, self.rect)
+        elif ((pygame.time.get_ticks()-self.got_invincible)//150)%2==0:
+            self.get_rect()
+            pygame.draw.line(screen, self.color, (self.x,self.y),(self.x+math.sin(self.an)*self.f2_power,self.y-math.cos(self.an)*self.f2_power), width=5)
+            pygame.draw.ellipse(screen, self.tank_color, self.rect)
+        elif pygame.time.get_ticks()-self.got_invincible>=self.invincible_time:
+            self.invincible=False
     def power_up(self):
         if self.f2_on:
             if self.f2_power < WIDTH/20 and not self.cooldown:
@@ -278,7 +285,7 @@ class Gun:
             self.live-=1
             if self.live==0:
                 self.deadend()
-            bullets=[]
+            explosion_wave.activate(self.x,self.y)
             self.invincible=True
             self.got_invincible=pygame.time.get_ticks()
         
@@ -315,6 +322,32 @@ class Gun:
                 r1,g1,b1=RED
                 r2,g2,b2=GREY
                 self.color = (r1+k*(r2-r1),g1+k*(g2-g1),b1+k*(b2-b1))
+class ExplosionWave:
+    def __init__(self):
+        self.active=False
+        self.x=None
+        self.y=None
+        self.r=0
+        self.color=YELLOW
+    def activate(self,x,y):
+        self.active=True
+        self.x=x
+        self.y=y
+        self.r=0
+        death_sound.play()
+        death_sound.fadeout(2500)
+    def grow(self):
+        self.r+=HEIGHT/(120*0.6)
+        if self.r**2>WIDTH**2+HEIGHT**2:
+            self.active=False
+    def annihilate(self):
+        for bullet in bullets:
+            if (bullet.x-self.x)**2 + (bullet.y-self.y)**2<=self.r**2:
+                bullets.remove(bullet)
+    def draw(self):
+        pygame.draw.circle(screen, self.color, (self.x,self.y),self.r,width=int(WIDTH/19))
+    
+        
 class Target:
     def __init__(self):
         self.points = 0
@@ -513,6 +546,7 @@ pygame.mixer.init()
 gunshot_normal_sound=pygame.mixer.Sound('normal_shot.mp3')
 gunshot_stick_sound=pygame.mixer.Sound('railgun_shot.mp3')
 gunshot_normal_sound.set_volume(0.8)
+death_sound=pygame.mixer.Sound('tank_explosion.mp3')
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 bullet = 0
 balls = []
@@ -522,6 +556,7 @@ boss_music = []
 boss = 6*[(WIDTH/2,HEIGHT*1/5,WIDTH/10)]
 
 clock = pygame.time.Clock()
+explosion_wave=ExplosionWave()
 gun = Gun(screen)
 target = Target()
 targets.append(target)
@@ -548,6 +583,10 @@ while not finished:
         bullet.draw()
     for b in balls:
         b.draw()
+    if explosion_wave.active:
+        explosion_wave.draw()
+        explosion_wave.grow()
+        explosion_wave.annihilate()
     draw_text(f'{total_count}',(10,10),18)  
     pygame.display.update()
     if done:
