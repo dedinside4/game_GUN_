@@ -2,10 +2,9 @@ import math
 from random import choice
 import random
 import pygame
-
+from scipy.optimize import root_scalar
 
 FPS = 120
-
 RED = (255,0,0)
 BLUE = 0x0000FF
 YELLOW = 0xFFC91F
@@ -15,7 +14,6 @@ CYAN = 0x00FFCC
 BLACK = (0, 0, 0)
 WHITE = 0xFFFFFF
 GREY = (125,125,125)
-print(GREY,RED)
 GAME_COLORS = [RED, BLUE, YELLOW, GREEN, MAGENTA, CYAN]
 
 WIDTH = 700
@@ -129,8 +127,27 @@ class Gun:
         self.got_invincible=pygame.time.get_ticks()
         self.invincible_time=4000
         self.continues=0
+        self.b=float(root_scalar(self.find_ellipse, bracket=[0, self.left]).root)
+        self.hitbox=None
     def get_rect(self):
         self.rect = pygame.Rect(self.x-self.left,self.y,2*self.left,self.bottom)
+        #pygame.draw.rect(screen,RED,self.rect)
+    def get_hitbox(self):
+        b=self.b
+        k=self.left/self.bottom/2
+        a=b/k
+        rect=pygame.Rect(self.x-a,self.y+self.bottom/2-b,2*a,2*b)
+        self.hitbox=rect
+        keystate=pygame.key.get_pressed()
+        if keystate[pygame.K_LSHIFT]:
+            pygame.draw.rect(screen,RED,rect)
+    def find_ellipse(self,b2):
+        a1=self.left
+        b1=self.bottom/2
+        k=a1/b1
+        c=math.sqrt(a1**2-b1**2)
+        f=math.sqrt(b2**2+(k*b2-c)**2)+math.sqrt(b2**2+(k*b2+c)**2)-2*k*b1
+        return f
     def fire2_start(self, event):
         self.f2_on = 1
         self.color = YELLOW
@@ -284,9 +301,8 @@ class CircleBullet1(Bullet):
     def get_rect(self):
         self.rect=pygame.Rect(self.x-self.r/math.sqrt(2),self.y-self.r/math.sqrt(2),self.r/math.sqrt(8),self.r/math.sqrt(8))
     def tank_hittest(self):
-        gun.get_rect()
         self.get_rect()
-        collision=self.rect.colliderect(gun.rect)
+        collision=self.rect.colliderect(gun.hitbox)
         return collision
     def draw(self):
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.r) 
@@ -381,6 +397,7 @@ next1=0
 while not finished:
     screen.fill(WHITE)
     gun.draw()
+    gun.get_hitbox()
     done=True
     for target in targets:
         if target.live:
