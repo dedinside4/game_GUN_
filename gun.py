@@ -38,8 +38,8 @@ class Ball:
         self.live = 1
         self.gy = -0.15
         self.killtime=pygame.time.get_ticks()+230000
-        self.mindamage = 15
-        self.maxdamage = 20
+        self.mindamage = 0.03
+        self.maxdamage = 0.04
     def move(self):
         """Переместить мяч по прошествии единицы времени.
 
@@ -102,7 +102,66 @@ class Ball:
     def do_you_want_to_die(self):
         if pygame.time.get_ticks()-self.killtime>=300:
             balls.remove(self)
+class Stick:
+    def __init__ (self,x,y,an,v,v1):
+        self.x=x
+        self.y=y
+        self.lenght = WIDTH/10
+        self.an=an
+        self.v=v
+        self.edge=(self.x+math.sin(self.an)*self.lenght,self.y-math.cos(self.an)*self.lenght)
+        self.vx=v * math.sin(self.an)+v1
+        self.vy = - v * math.cos(self.an)
+        self.color = choice(GAME_COLORS)
+        self.mindamage = 0.0035
+        self.maxdamage = 0.0045
+        self.live=1
+        self.killtime=pygame.time.get_ticks()+230000
+    def move(self):
+        self.x+=self.vx
+        self.y+=self.vy
+        self.edge=(self.x+math.sin(self.an)*self.lenght,self.y-math.cos(self.an)*self.lenght)
+        x,y=self.edge
+        if self.v>0 and x>WIDTH:
+            self.vx=0
+            self.vy=0
+            self.v=0
+            self.killtime=pygame.time.get_ticks()
+        elif self.v>0 and  x<0:
+            self.vx=0
+            self.vy=0
+            self.v=0
+            self.killtime=pygame.time.get_ticks()
+        elif self.v>0 and  y>HEIGHT:
+            self.vx=0
+            self.vy=0
+            self.v=0
+            self.killtime=pygame.time.get_ticks()
+        elif self.v>0 and y<0:
+            self.vx=0
+            self.vy=0
+            self.v=0
+            self.killtime=pygame.time.get_ticks()
+    def do_you_want_to_die(self):
+        if pygame.time.get_ticks()-self.killtime>=300:
+            balls.remove(self)
+    def hittest(self, obj):
+        """Функция проверяет сталкивалкивается ли данный обьект с целью, описываемой в обьекте obj.
 
+        Args:
+            obj: Обьект, с которым проверяется столкновение.
+        Returns:
+            Возвращает True в случае столкновения мяча и цели. В противном случае возвращает False.
+        """
+        x,y=self.edge
+        collision = False
+        if (x-obj.x)**2+(y-obj.y)**2<=obj.r**2:
+            collision=True
+        return collision
+    def draw(self):
+        pygame.draw.line(screen, self.color, (self.x,self.y),self.edge, width=5)
+        
+        
 class Gun:
     def __init__(self, screen, x=WIDTH/2, y=HEIGHT):
         self.screen = screen
@@ -156,14 +215,16 @@ class Gun:
             if event.button==1:
                 self.fire1_start()
                 self.fire_type=1
-                #self.f2_on = 1
-                #self.color = YELLOW
+            elif event.button==3:
+                self.fire3_start()
+                self.fire_type=3
     def fire_end(self, event):
         if event.button==self.fire_type:
             exec(f'self.fire{event.button}_end()')
+    def fire3_start(self):
+        self.f2_on = 1
     def fire1_start(self):
         self.f2_on = 1
-        self.color = YELLOW
     def fire1_end(self):
         global balls
         new_ball = Ball(self.screen,self.x,self.y)
@@ -175,6 +236,17 @@ class Gun:
         self.f2_on = 0
         self.f2_power = WIDTH/60
         self.cooldown=True
+        self.cooldown_time=5000
+        self.last_shot=pygame.time.get_ticks()
+        gunshot_normal_sound.play()
+        self.fire_type=None
+    def fire3_end(self):
+        new_stick = Stick(self.x,self.y,self.an,self.f2_power*2,self.v)
+        balls.append(new_stick)
+        self.f2_on = 0
+        self.f2_power = WIDTH/60
+        self.cooldown=True
+        self.cooldown_time=7000
         self.last_shot=pygame.time.get_ticks()
         gunshot_normal_sound.play()
         self.fire_type=None
@@ -303,10 +375,11 @@ class CircleBullet1(Bullet):
         self.color=RED
         self.rect=self.x-self.r/math.sqrt(2),self.y-self.r/math.sqrt(2),self.r/math.sqrt(8),self.r/math.sqrt(8)
     def ball_hittest(self,obj):
-        collision = False
-        if (obj.x-self.x)**2+(obj.y-self.y)**2<=(self.r + obj.r)**2:
-            collision=True
-        return collision
+##        collision = False
+##        if (obj.x-self.x)**2+(obj.y-self.y)**2<=(self.r + obj.r)**2:
+##            collision=True
+##        return collision
+        return obj.hittest(self)
     def get_rect(self):
         self.rect=pygame.Rect(self.x-self.r/math.sqrt(2),self.y-self.r/math.sqrt(2),self.r/math.sqrt(8),self.r/math.sqrt(8))
     def tank_hittest(self):
@@ -331,7 +404,12 @@ class Boss:
     def move(self):
         pass
     def hit(self,ball):
-        self.live-=random.randint(ball.mindamage,ball.maxdamage)
+        pass
+        an=math.atan((ball.x-self.x)/(ball.y-self.y))
+        v=-ball.vy*math.cos(an)-ball.vx*math.sin(an)
+        mindamage=int(ball.mindamage*v**2)
+        maxdamage=int(ball.maxdamage*v**2)
+        self.live-=random.randint(mindamage,maxdamage)
         balls.remove(ball)
         if self.live<=0:
             self.next_attack()      
@@ -352,7 +430,7 @@ class Boss1(Boss):
     def attack_1(self):
         self.live=50
         self.max_live=50
-        self.attack_pattern=AttackPattern1(self.x,self.y,WIDTH/8,1,35,45,7,HEIGHT/100)
+        self.attack_pattern=AttackPattern1(self.x,self.y,WIDTH/8,0.2,20,25,4,HEIGHT/100)
     def spellcard_1(self):
         self.live=50
         self.max_live=50
@@ -489,7 +567,7 @@ while not finished:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             finished = True
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button==1 and not gun.cooldown:
+        elif event.type == pygame.MOUSEBUTTONDOWN and not gun.cooldown:
             gun.fire_start(event)
         elif event.type == pygame.MOUSEBUTTONUP and gun.f2_on:
             gun.fire_end(event)
