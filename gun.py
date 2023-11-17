@@ -3,7 +3,7 @@ from random import choice
 import random
 import pygame
 from scipy.optimize import root_scalar
-
+import spellcards
 FPS = 120
 RED = (255,0,0)
 BLUE = 0x0000FF
@@ -15,10 +15,8 @@ BLACK = (0, 0, 0)
 WHITE = 0xFFFFFF
 GREY = (125,125,125)
 GAME_COLORS = [RED, BLUE, YELLOW, GREEN, MAGENTA, CYAN]
-
 WIDTH = 700
 HEIGHT = 760
-
 
 class Ball:
     def __init__(self, screen: pygame.Surface, x=40, y=450):
@@ -95,8 +93,9 @@ class Ball:
         Returns:
             Возвращает True в случае столкновения мяча и цели. В противном случае возвращает False.
         """
+        x,y,r=obj
         collision = False
-        if (obj.x-self.x)**2+(obj.y-self.y)**2<=(self.r + obj.r)**2:
+        if (x-self.x)**2+(y-self.y)**2<=(self.r + r)**2:
             collision=True
         return collision
     def do_you_want_to_die(self):
@@ -153,9 +152,10 @@ class Stick:
         Returns:
             Возвращает True в случае столкновения мяча и цели. В противном случае возвращает False.
         """
+        x1,y1,r=obj
         x,y=self.edge
         collision = False
-        if (x-obj.x)**2+(y-obj.y)**2<=obj.r**2:
+        if (x-x1)**2+(y-y1)**2<=r**2:
             collision=True
         return collision
     def draw(self):
@@ -219,7 +219,7 @@ class Gun:
                 self.fire3_start()
                 self.fire_type=3
     def fire_end(self, event):
-        if event.button==self.fire_type:
+        if event.button==self.fire_type and not self.cooldown:
             exec(f'self.fire{event.button}_end()')
     def fire3_start(self):
         self.f2_on = 1
@@ -338,12 +338,13 @@ class ExplosionWave:
         death_sound.fadeout(2500)
     def grow(self):
         self.r+=HEIGHT/(120*0.6)
-        if self.r**2>WIDTH**2+HEIGHT**2:
+        if self.r**2>3*WIDTH**2+3*HEIGHT**2:
             self.active=False
     def annihilate(self):
         for bullet in bullets:
             if (bullet.x-self.x)**2 + (bullet.y-self.y)**2<=self.r**2:
                 bullets.remove(bullet)
+                bullet.killed=True
     def draw(self):
         pygame.draw.circle(screen, self.color, (self.x,self.y),self.r,width=int(WIDTH/19))
     
@@ -389,40 +390,7 @@ class Target:
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.r)
     def attack(self):
         pass
-class Bullet:
-    def __init__(self,vx,vy,x,y):
-        self.vy=vy
-        self.vx=vx
-        self.x=x
-        self.y=y
-    def hit_ball(self,ball):
-        bullets.remove(self)
-    def hit_tank(self):
-        bullets.remove(self)
-        gun.get_hit()
-    def move(self):
-        self.x+=self.vx
-        self.y+=self.vy
-class CircleBullet1(Bullet):
-    def __init__(self,vx,vy,x,y,r=HEIGHT/100):
-        Bullet.__init__(self,vx,vy,x,y)
-        self.r=r
-        self.color=RED
-        self.rect=self.x-self.r/math.sqrt(2),self.y-self.r/math.sqrt(2),self.r/math.sqrt(8),self.r/math.sqrt(8)
-    def ball_hittest(self,obj):
-##        collision = False
-##        if (obj.x-self.x)**2+(obj.y-self.y)**2<=(self.r + obj.r)**2:
-##            collision=True
-##        return collision
-        return obj.hittest(self)
-    def get_rect(self):
-        self.rect=pygame.Rect(self.x-self.r/math.sqrt(2),self.y-self.r/math.sqrt(2),self.r/math.sqrt(8),self.r/math.sqrt(8))
-    def tank_hittest(self):
-        self.get_rect()
-        collision=self.rect.colliderect(gun.hitbox)
-        return collision
-    def draw(self):
-        pygame.draw.circle(screen, self.color, (self.x,self.y), self.r) 
+
         
 class Boss:
     def __init__(self,x=WIDTH/2,y=HEIGHT*1/5,r=WIDTH/10):
@@ -436,6 +404,7 @@ class Boss:
         #self.pattern=1
     def draw(self):
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.r)
+        draw_text(self.name,(WIDTH/10,HEIGHT/70),WIDTH//39)
     def move(self):
         pass
     def hit(self,ball):
@@ -454,57 +423,38 @@ class Boss1(Boss):
         self.pull=['attack_1','spellcard_1','attack_2','spellcard_2']
         self.order=0
         self.attack_pattern=None
+        self.name='Ball 1'
     def attack(self):
-        self.attack_pattern.activate()
+        self.attack_pattern.activate(bullets)
     def next_attack(self):
         try:
             exec('self.'+self.pull[self.order]+'()')
             self.order+=1
-        except:
-            self.live=0
-    def attack_1(self):
-        self.live=50
-        self.max_live=50
-        self.attack_pattern=AttackPattern1(self.x,self.y,WIDTH/8,0.2,20,25,4,HEIGHT/100)
+        except Exception as e:
+            #self.live=0
+            print(e)
     def spellcard_1(self):
         self.live=50
         self.max_live=50
-        self.attack_pattern=AttackPattern1(self.x,self.y,WIDTH/8,0.3,20,25,4,HEIGHT/100)
+        self.attack_pattern=spellcards.AttackPattern1(self.x,self.y,WIDTH/8,0.2,20,25,4,HEIGHT/100)
+    def attack_1(self):
+        spell_name='Camicadze drones'
+        self.live=50
+        self.max_live=50
+        self.attack_pattern=spellcards.SpellCard1(gun,self.x,self.y)
     def attack_2(self):
         self.live=50
         self.max_live=50
-        self.attack_pattern=AttackPattern1(self.x,self.y,WIDTH/8,1.3,7,10,5,HEIGHT/20)
+        self.attack_pattern=spellcards.AttackPattern1(self.x,self.y,WIDTH/8,1.3,7,10,5,HEIGHT/20)
     def spellcard_2(self):
+        spell_name='The Tank Has Landed'
         self.live=50
         self.max_live=50
-        self.attack_pattern=AttackPattern1(self.x,self.y,WIDTH/8,0.8,10,15,5,HEIGHT/40)
+        self.attack_pattern=spellcards.AttackPattern1(self.x,self.y,WIDTH/8,0.8,10,15,5,HEIGHT/40)
         
         
     
-class AttackPattern1:
-    def __init__(self,x,y,r,period,count1,count2,v,size):
-        self.first_delay=2000
-        self.last_shot=pygame.time.get_ticks()+self.first_delay
-        self.delay=period*1000
-        self.v=v
-        self.count=random.randint(count1,count2)
-        self.phase=random.random()*2*math.pi/self.count
-        self.x=x
-        self.y=y
-        self.r=r
-        self.size=size
-    def activate(self):
-        if pygame.time.get_ticks() - self.last_shot>=self.delay:
-            self.phase=random.random()*2*math.pi/self.count
-            self.scatter()
-            self.last_shot=pygame.time.get_ticks()
-    def scatter(self):
-        global bullets
-        for i in range(0,self.count):
-            angle=i*2*math.pi/self.count+self.phase
-            x1=self.x+math.sin(angle)*self.r
-            y1=self.y-math.cos(angle)*self.r
-            bullets.append(CircleBullet1(self.v*math.sin(angle),-math.cos(angle)*self.v,x1,y1,self.size))
+
             
 def next_boss(number):
     try:
@@ -516,6 +466,12 @@ def next_boss(number):
     except:
         game_over()
 font_name=pygame.font.match_font('arial')
+def draw_lives():
+    for i in range(0,gun.live-1):
+        pygame.draw.circle(screen, MAGENTA, (WIDTH-WIDTH/7-7*WIDTH/80+i*WIDTH/40,HEIGHT/14), WIDTH/90)
+    for i in range(gun.live-1,8):
+        pygame.draw.circle(screen, BLACK, (WIDTH-WIDTH/7-7*WIDTH/80+i*WIDTH/40,HEIGHT/14), WIDTH/90)
+    draw_text('Lives', (WIDTH-WIDTH/7,HEIGHT/30), WIDTH//30, BLACK)
 def draw_health_bar(boss):
     k=max(0,boss.live/boss.max_live)
     pygame.draw.line(screen, BLACK, (WIDTH/60,HEIGHT/30),(WIDTH-WIDTH/60,HEIGHT/30), width=5)
@@ -580,14 +536,13 @@ while not finished:
         if type(target)==type(eval(f'Boss{boss_number}()')):
             draw_health_bar(target)
     for bullet in bullets:
-        bullet.draw()
+        bullet.draw(screen)
     for b in balls:
         b.draw()
     if explosion_wave.active:
         explosion_wave.draw()
-        explosion_wave.grow()
-        explosion_wave.annihilate()
-    draw_text(f'{total_count}',(10,10),18)  
+    draw_lives()
+    #draw_text(f'{total_count}',(10,10),18)  
     pygame.display.update()
     if done:
         #end_music()
@@ -621,23 +576,26 @@ while not finished:
         target.move()
         target.attack()
         for b in balls:
-            if b.hittest(target) and target.live:
+            if b.hittest((target.x,target.y,target.r)) and target.live:
                 total_count += 1
                 target.hit(b)
     for b in balls:
         b.do_you_want_to_die()
         b.move()
         for target in targets:
-            if b.hittest(target) and target.live:
+            if b.hittest((target.x,target.y,target.r)) and target.live:
                 total_count += 1
                 target.hit(b)
         for bullet in bullets:
             if bullet.ball_hittest(b):
-                bullet.hit_ball(b)
+                bullet.hit_ball(b,bullets)
     for bullet in bullets:
-        bullet.move()
-        if bullet.tank_hittest():
-            bullet.hit_tank()
+        bullet.move(bullets)
+        if bullet.tank_hittest(gun):
+            bullet.hit_tank(bullets,gun)
+    if explosion_wave.active:
+        explosion_wave.grow()
+        explosion_wave.annihilate()
     gun.move()
     gun.targetting(list(pygame.mouse.get_pos()))
     gun.cooling()
