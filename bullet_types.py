@@ -73,7 +73,7 @@ class ArrowBullet1(Bullet):
         self.h1=h1
         self.h2=h2
         self.r1=2*l*(l**2+h2**2)/(4*l*h2)
-        self.r2=l*h2/(l+math.sqrt(l**2+h2**2))*1.5
+        self.r2=l*h2/(l+math.sqrt(l**2+h2**2))
         self.h3=math.sqrt(self.r1**2-l**2)
         self.color=color
         self.edge=(self.x+self.h2*math.sin(self.an),self.y-self.h2*math.cos(self.an))
@@ -82,7 +82,9 @@ class ArrowBullet1(Bullet):
         self.vy=-self.v*math.cos(self.an)
         self.vx=self.v*math.sin(self.an)
     def get_rect(self):
-        self.rect=pygame.Rect(self.x-self.r2/math.sqrt(2),self.y-self.r2/math.sqrt(2),2*self.r2/math.sqrt(2),2*self.r2/math.sqrt(2))
+        x=self.x+self.r2*math.sin(self.an)
+        y=self.y-self.r2*math.cos(self.an)
+        self.rect=pygame.Rect(x-self.r2,y-self.r2,2*self.r2,2*self.r2)
     def tank_hittest(self,gun):
         self.get_rect()
         collision=self.rect.colliderect(gun.hitbox)

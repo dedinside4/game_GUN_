@@ -15,11 +15,9 @@ GREY = (125,125,125)
 GAME_COLORS = [RED, BLUE, YELLOW, GREEN, MAGENTA, CYAN]
 WIDTH = 700
 HEIGHT = 760
-class Spellcard1:
-    pass
 class AttackPattern1:
     def __init__(self,x,y,r,period,count1,count2,v,size,lifetime):
-        self.first_delay=2000
+        self.first_delay=2500
         self.last_shot=pygame.time.get_ticks()+self.first_delay
         self.delay=period*1000
         self.v=v
@@ -29,7 +27,6 @@ class AttackPattern1:
         self.y=y
         self.r=r
         self.size=size
-        self.bullets=[]
         self.lifetime=lifetime
     def activate(self,bullets):
         if pygame.time.get_ticks() - self.last_shot>=self.delay:
@@ -42,14 +39,50 @@ class AttackPattern1:
             x1=self.x+math.sin(angle)*self.r
             y1=self.y-math.cos(angle)*self.r
             bullet=bullet_types.CircleBullet1(self.v*math.sin(angle),-math.cos(angle)*self.v,x1,y1,self.size,self.lifetime)
-            self.bullets.append(bullet)
             bullets.append(bullet)
-    def destroy(self,bullets):
-        for bullet in self.bullets:
-            try:
-                bullets.pop(bullets.index(bullet))
-            except:
-                pass
+class AttackPattern3:
+    def __init__(self,x,y,r,period,count,r_speed,rotate_speed,size,lifetime):    
+        self.first_delay=2500
+        self.last_shot=pygame.time.get_ticks()+self.first_delay
+        self.delay=period*1000
+        self.rotate_speed=rotate_speed
+        self.r_speed=r_speed
+        self.count=count
+        self.phase=random.random()*2*math.pi/self.count
+        self.x=x
+        self.y=y
+        self.r=r
+        self.size=size
+        self.clusters=[]
+        self.lifetime=lifetime
+    def activate(self,bullets):
+        self.update()
+        if pygame.time.get_ticks() - self.last_shot>=self.delay:
+            self.phase=random.random()*2*math.pi/self.count
+            self.scatter(bullets)
+            self.last_shot=pygame.time.get_ticks()
+    def scatter(self,bullets):
+        cluster=[self.r,self.phase,random.randint(-1,1)]
+        for i in range(0,self.count):
+            angle=i*2*math.pi/self.count+self.phase
+            x1=self.x+math.sin(angle)*self.r
+            y1=self.y-math.cos(angle)*self.r
+            bullet=bullet_types.CircleBullet1(0,0,x1,y1,self.size,self.lifetime)
+            bullets.append(bullet)
+            cluster.append(bullet)
+        self.clusters.append(cluster)
+    def update(self):
+        for cluster in self.clusters:
+            cluster[0]+=self.r_speed
+            cluster[1]+=self.rotate_speed*cluster[2]
+            #print(cluster[0])
+            for i in range(3,len(cluster)):
+                angle=(i-3)*2*math.pi/self.count+cluster[1]
+                cluster[i].x=self.x+math.sin(angle)*cluster[0]
+                cluster[i].y=self.y-math.cos(angle)*cluster[0]
+            if cluster[0]>2*HEIGHT:
+                self.clusters.remove(cluster)
+            
 class AttackPattern2:
     def __init__(self,x,y,period,v,size,gun):
         self.l,self.h1,self.h2=size
@@ -79,26 +112,26 @@ class SpellCard1:
         self.drones=[]
         self.shards=[]
         self.rotatable=[]
-        self.first_delay=2000
+        self.first_delay=2500
         self.last_shot=pygame.time.get_ticks()+self.first_delay
-        self.count=23
+        self.count=35
         self.hight=HEIGHT/2
-        self.v=5
+        self.v=7
         self.rotate_speed=0.01
         self.l=WIDTH/(self.count*2.4)
         self.h2=self.l*2.4
         self.h1=self.h2*0.2
-        self.period=200
+        self.period=80
         self.phase=1
         self.act=None
         self.phase_1_done=None
-        self.delay_1=700
+        self.delay_1=100
         self.detection_range=math.sqrt((HEIGHT/2)**2+(WIDTH*3/17)**2)
-        self.phase_2_time=1300
+        self.phase_2_time=2500
         self.thrusted=[]
-        self.detonation_time=1000
-        self.wave_expansion_time=30
-        self.r_shard=WIDTH/70
+        self.detonation_time=600
+        self.wave_expansion_time=50
+        self.r_shard=WIDTH/29
         self.count_shard=17
     def phase_1(self,bullets):
         i=1
@@ -163,9 +196,9 @@ class SpellCard1:
     def phase_3(self,bullets):
         #print('worked')
         while len(self.thrusted)!=len(self.drones):
-            print(len(self.thrusted),len(self.drones))
+            #print(len(self.thrusted),len(self.drones))
             for drone in self.drones:
-                print(drone.killed)
+                #print(drone.killed)
                 if drone.killed:
                     self.drones.remove(drone)
                     try:  
@@ -188,7 +221,7 @@ class SpellCard1:
             yield 2
         yield 3
     def phase_4(self,bullets):
-        print(len(self.drones))
+        #print(len(self.drones))
         for drone in self.drones:
             shard=AttackPattern1(drone.x,drone.y,self.r_shard,1000,self.count_shard,self.count_shard,0,WIDTH/100,self.wave_expansion_time)
             shard.scatter(bullets)
@@ -244,7 +277,6 @@ class SpellCard1:
                 self.rotatable.remove(drone)
     def activate(self,bullets):
         #exec(f'self.phase_{self.phase}(bullets)')
-        #print(self.act,self.phase)
         if self.act is None:
             self.act=eval(f'self.phase_{self.phase}(bullets)')
         else:
@@ -255,3 +287,22 @@ class SpellCard1:
                 self.act=None
                 exec(f'self.phase_{self.phase}_done=pygame.time.get_ticks()')
                 self.phase+=1
+class SpellCard2:
+    def __init__(self,gun):
+        self.gun=gun
+        self.dead=False
+        self.delay=1500
+        self.started=pygame.time.get_ticks()
+    def activate(self,bullets):
+        if not self.dead and pygame.time.get_ticks()-self.started>=self.delay:
+            if self.gun.landed:
+                self.gun.update_trigger()
+                self.gun.targetting()
+                self.gun.fire_start()
+                self.gun.power_up()
+                self.gun.cooling()
+            else:
+                self.gun.fall()
+            self.dead=self.gun.get_hit()
+            self.dead=self.gun.get_hit_tank() or self.dead
+        

@@ -4,6 +4,7 @@ import random
 import pygame
 from scipy.optimize import root_scalar
 import spellcards
+import bullet_types
 FPS = 120
 RED = (255,0,0)
 BLUE = 0x0000FF
@@ -281,11 +282,11 @@ class Gun:
         if pygame.time.get_ticks()-self.got_invincible>=self.invincible_time:
             self.invincible=False
         if not self.invincible:
-            global bullets
             self.live-=1
             if self.live==0:
                 self.deadend()
-            explosion_wave.activate(self.x,self.y)
+            explosion_waves.append(ExplosionWave(self.x,self.y))
+            play_death_sound()
             self.invincible=True
             self.got_invincible=pygame.time.get_ticks()
         
@@ -322,24 +323,125 @@ class Gun:
                 r1,g1,b1=RED
                 r2,g2,b2=GREY
                 self.color = (r1+k*(r2-r1),g1+k*(g2-g1),b1+k*(b2-b1))
+class EvilGun(Gun):
+    def __init__(self, screen, x, y):
+        Gun.__init__(self,screen,x,y)
+        self.trigger=(x,y)
+        self.trigger_speed=4
+        self.g=0.15
+        self.vy=0
+        self.landed=False
+        self.live=4
+        self.speed_factor=0.5
+    def fall(self):
+        if not self.landed or self.y<HEIGHT-WIDTH/30:
+            self.vy+=self.g
+            self.y+=self.vy
+            if self.y>=HEIGHT-WIDTH/30:
+                self.y=HEIGHT-WIDTH/30
+                self.landed=True
+    def get_hit_tank(self):
+        dead=False
+        if gun.x-gun.left>=self.x and gun.x-gun.left<=self.x+self.left:
+            gun.get_hit()
+            if not self.invincible:
+                self.live-=1
+                self.invincible=True
+                self.got_invincible=pygame.time.get_ticks()
+                if self.live==0:
+                    dead=True
+                    self.dead_end()
+                play_death_sound()
+            gun.x=self.x+self.left+gun.left
+        elif gun.x+gun.left<=self.x and gun.x+gun.left>=self.x-self.left:
+            gun.get_hit()
+            if not self.invincible:
+                self.live-=1
+                self.invincible=True
+                self.got_invincible=pygame.time.get_ticks()
+                if self.live==0:
+                    dead=True
+                    self.dead_end()
+                play_death_sound()
+            gun.x=self.x-self.left-gun.left
+        return dead
+    def get_hit(self):
+        if pygame.time.get_ticks()-self.got_invincible>=self.invincible_time:
+            self.invincible=False
+        dead=False
+        if not self.invincible:
+            for ball in balls:
+                if ball.hittest((self.x,self.y+self.bottom/2,self.bottom/2)):
+                    self.live-=1
+                    self.invincible=True
+                    self.got_invincible=pygame.time.get_ticks()
+                    if self.live==0:
+                        dead=True
+                        self.dead_end()
+                    play_death_sound()
+        return dead
+    def dead_end(self):
+        global evilgun
+        evilgun=None
+        explosion_waves.append(ExplosionWave(self.x,self.y))
+    def targetting(self):
+        """Прицеливание. Зависит от положения мыши."""
+        x,y=self.trigger
+        try:
+            self.an = math.atan2((x - self.x), (self.y - y))
+        except:
+            self.an = -math.pi/2
+        if self.f2_on:
+            self.color = RED
+        #print(self.an)
+    def update_trigger(self):
+        x,y=self.trigger
+        an = math.atan2((gun.x - x), (y - gun.y))
+        x+=self.trigger_speed*math.sin(an)
+        y+=-self.trigger_speed*math.cos(an)
+        if gun.x - x<=10:
+            x=gun.x
+        if gun.y - y<=10:
+            y=gun.y
+        self.trigger=(x,y)
+        #print(self.trigger,(gun.x,gun.y))
+    def fire_start(self):
+        an1 = math.atan2((gun.x - self.x), (self.y - gun.y-gun.bottom))
+        an2 = math.atan2((gun.x - self.x), (self.y - gun.y+gun.top))
+        #print(an1,an2,self.an)
+        if ((an1>an2 and self.an<=an1 and self.an>=an2) or (an2>an1 and self.an<=an2 and self.an>=an1)) and not self.cooldown:
+            #print('started',self.y)
+            self.f2_on = 1
+    def fire_end(self):
+        new_ball = Ball(self.screen,self.x,self.y)
+        #self.an = math.atan2((event.pos[0] - new_ball.x), (new_ball.y - event.pos[1]))
+        vx = self.f2_power * math.sin(self.an)*0.7*self.speed_factor+self.v
+        vy = - self.f2_power * math.cos(self.an)*0.7*self.speed_factor
+        new_bullet = bullet_types.CircleBullet1(vx,vy,self.x,self.y,9)
+        bullets.append(new_bullet)
+        self.f2_on = 0
+        self.f2_power = WIDTH/60
+        self.cooldown=True
+        self.cooldown_time=5000
+        self.last_shot=pygame.time.get_ticks()
+        pygame.mixer.Sound('normal_shot.mp3').play()
+    def power_up(self):
+        if self.f2_on:
+            if self.f2_power < WIDTH/20:
+                self.f2_power += WIDTH/(60*FPS*1)
+                if self.f2_power>=WIDTH/20:
+                    self.fire_end()
+            self.color = RED
 class ExplosionWave:
-    def __init__(self):
-        self.active=False
-        self.x=None
-        self.y=None
-        self.r=0
-        self.color=YELLOW
-    def activate(self,x,y):
-        self.active=True
+    def __init__(self,x,y):
         self.x=x
         self.y=y
         self.r=0
-        death_sound.play()
-        death_sound.fadeout(2500)
+        self.color=YELLOW
     def grow(self):
         self.r+=HEIGHT/(120*0.6)
         if self.r**2>3*WIDTH**2+3*HEIGHT**2:
-            self.active=False
+            explosion_waves.remove(self)
     def annihilate(self):
         for bullet in bullets:
             if (bullet.x-self.x)**2 + (bullet.y-self.y)**2<=self.r**2:
@@ -422,37 +524,51 @@ class Boss1(Boss):
         Boss.__init__(self,x,y,r)
         self.pull=['attack_1','spellcard_1','attack_2','spellcard_2']
         self.order=0
-        self.attack_pattern=None
+        self.attack_patterns=[]
         self.name='Ball 1'
+        self.spell_name=''
     def attack(self):
-        self.attack_pattern.activate(bullets)
+        for attack in self.attack_patterns:
+            attack.activate(bullets)
     def next_attack(self):
+        global evilgun
+        evilgun=None
         try:
+            if self.order>0:
+                explosion_waves.append(ExplosionWave(self.x,self.y))
             exec('self.'+self.pull[self.order]+'()')
             self.order+=1
         except Exception as e:
             #self.live=0
+            #global evilgun
+            #evilgun=None
             print(e)
-    def spellcard_1(self):
-        self.live=50
-        self.max_live=50
-        self.attack_pattern=spellcards.AttackPattern1(self.x,self.y,WIDTH/8,0.2,20,25,4,HEIGHT/100)
     def attack_1(self):
-        spell_name='Camicadze drones'
-        self.live=50
-        self.max_live=50
-        self.attack_pattern=spellcards.SpellCard1(gun,self.x,self.y)
+        self.attack_patterns=[]
+        self.spell_name=''
+        self.live=70
+        self.max_live=70
+        self.attack_patterns.append(spellcards.AttackPattern1(self.x,self.y,WIDTH/8,0.3,20,25,4,HEIGHT/100,10000))
+    def spellcard_1(self):
+        self.attack_patterns=[]
+        self.spell_name='Kamikaze Drones'
+        self.live=70
+        self.max_live=70
+        self.attack_patterns.append(spellcards.SpellCard1(gun,self.x,self.y))
     def attack_2(self):
-        self.live=50
-        self.max_live=50
-        self.attack_pattern=spellcards.AttackPattern1(self.x,self.y,WIDTH/8,1.3,7,10,5,HEIGHT/20)
+        self.attack_patterns=[]
+        self.live=70
+        self.max_live=70
+        self.attack_patterns.append(spellcards.AttackPattern3(self.x,self.y,WIDTH/8,1,15,5,0.005,HEIGHT/50,15000))
     def spellcard_2(self):
-        spell_name='The Tank Has Landed'
-        self.live=50
-        self.max_live=50
-        self.attack_pattern=spellcards.AttackPattern1(self.x,self.y,WIDTH/8,0.8,10,15,5,HEIGHT/40)
-        
-        
+        global evilgun
+        self.attack_patterns=[]
+        self.spell_name='The Tank Has Landed'
+        self.live=70
+        self.max_live=70
+        evilgun=EvilGun(screen,self.x,self.y)
+        self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.4,6,(WIDTH/40,WIDTH/30,WIDTH/80),gun))
+        self.attack_patterns.append(spellcards.SpellCard2(evilgun))    
     
 
             
@@ -471,7 +587,7 @@ def draw_lives():
         pygame.draw.circle(screen, MAGENTA, (WIDTH-WIDTH/7-7*WIDTH/80+i*WIDTH/40,HEIGHT/14), WIDTH/90)
     for i in range(gun.live-1,8):
         pygame.draw.circle(screen, BLACK, (WIDTH-WIDTH/7-7*WIDTH/80+i*WIDTH/40,HEIGHT/14), WIDTH/90)
-    draw_text('Lives', (WIDTH-WIDTH/7,HEIGHT/30), WIDTH//30, BLACK)
+    #draw_text('Lives', (WIDTH-WIDTH/7,HEIGHT/30), WIDTH//30, BLACK)
 def draw_health_bar(boss):
     k=max(0,boss.live/boss.max_live)
     pygame.draw.line(screen, BLACK, (WIDTH/60,HEIGHT/30),(WIDTH-WIDTH/60,HEIGHT/30), width=5)
@@ -489,6 +605,10 @@ def set_music(track):
     pygame.mixer.music.play(loops=-1)
 def end_music():
     pygame.mixer.music.unload()
+def play_death_sound():
+    death_sound=pygame.mixer.Sound('tank_explosion.mp3')
+    death_sound.play()
+    death_sound.fadeout(2500)
 def game_over():
     global finished
     screen.fill(BLACK)
@@ -512,7 +632,7 @@ boss_music = []
 boss = 6*[(WIDTH/2,HEIGHT*1/5,WIDTH/10)]
 
 clock = pygame.time.Clock()
-explosion_wave=ExplosionWave()
+explosion_waves=[]
 gun = Gun(screen)
 target = Target()
 targets.append(target)
@@ -520,6 +640,7 @@ target = Target()
 targets.append(target)
 finished = False
 winner = False
+evilgun=None
 total_count = 0
 shot_count = 0
 next1=0
@@ -527,6 +648,10 @@ boss_number=1
 while not finished:
     screen.fill(WHITE)
     gun.draw()
+    try:
+        evilgun.draw()
+    except:
+        pass
     gun.get_hitbox()
     done=True
     for target in targets:
@@ -535,12 +660,13 @@ while not finished:
             done=False
         if type(target)==type(eval(f'Boss{boss_number}()')):
             draw_health_bar(target)
+            draw_text(target.spell_name, (WIDTH-WIDTH/7,HEIGHT/30), WIDTH//30, BLACK)
     for bullet in bullets:
         bullet.draw(screen)
     for b in balls:
         b.draw()
-    if explosion_wave.active:
-        explosion_wave.draw()
+    for wave in explosion_waves:
+        wave.draw()
     draw_lives()
     #draw_text(f'{total_count}',(10,10),18)  
     pygame.display.update()
@@ -593,9 +719,9 @@ while not finished:
         bullet.move(bullets)
         if bullet.tank_hittest(gun):
             bullet.hit_tank(bullets,gun)
-    if explosion_wave.active:
-        explosion_wave.grow()
-        explosion_wave.annihilate()
+    for wave in explosion_waves:
+        wave.grow()
+        wave.annihilate()
     gun.move()
     gun.targetting(list(pygame.mouse.get_pos()))
     gun.cooling()
