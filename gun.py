@@ -20,25 +20,29 @@ WIDTH = 700
 HEIGHT = 760
 
 class Ball:
-    def __init__(self, screen: pygame.Surface, x=40, y=450):
+    def __init__(self, x, y,r=9):
         """ Конструктор класса ball
 
         Args:
         x - начальное положение мяча по горизонтали
         y - начальное положение мяча по вертикали
         """
+        self.speed_loss=0.5
         self.screen = screen
         self.x = x
         self.y = y
-        self.r = 4
+        self.r = r
         self.vx = 0
         self.vy = 0
         self.color = choice(GAME_COLORS)
         self.live = 1
         self.gy = -0.15
         self.killtime=pygame.time.get_ticks()+230000
-        self.mindamage = 0.03
-        self.maxdamage = 0.04
+        self.density=0.8/(9**3)
+        self.std=1/7
+        self.mindamage = self.density*(self.r**3)*(1-self.std)
+        self.maxdamage = self.density*(self.r**3)*(1+self.std)
+        #print(self.mindamage,self.maxdamage)
     def move(self):
         """Переместить мяч по прошествии единицы времени.
 
@@ -51,28 +55,28 @@ class Ball:
         self.y += self.vy
         if self.x>WIDTH - self.r:
             self.x = WIDTH - self.r
-            self.vx*=-0.5
-            self.vy*=0.9
+            self.vx*=-(1-self.speed_loss)
+            self.vy*=1-self.speed_loss*0.2
             if abs(self.vx)<0.5:
                 self.vx=0
         if self.x<self.r:
             self.x = self.r
-            self.vx*=-0.5
-            self.vy*=0.9
+            self.vx*=-(1-self.speed_loss)
+            self.vy*=1-self.speed_loss*0.2
             if abs(self.vx)<0.5:
                 self.vx=0
         if self.y>=HEIGHT - self.r:
             self.y = HEIGHT - self.r
-            self.vy*=-0.5
-            self.vx*=0.9
+            self.vy*=-(1-self.speed_loss)
+            self.vx*=1-self.speed_loss*0.2
             if abs(self.vy)<0.5 and self.gy<0:
                 self.vy=0
                 self.gy=0
                 self.killtime=pygame.time.get_ticks()
         if self.y<self.r:
             self.y = self.r
-            self.vy*=-0.5
-            self.vx*=0.9
+            self.vy*=-(1-self.speed_loss)
+            self.vx*=1-self.speed_loss*0.2
             if abs(self.vy)<0.5:
                 self.killtime=pygame.time.get_ticks()
                 self.vy=0
@@ -100,27 +104,29 @@ class Ball:
             collision=True
         return collision
     def do_you_want_to_die(self):
-        if pygame.time.get_ticks()-self.killtime>=300:
+        if pygame.time.get_ticks()-self.killtime>=100:
             balls.remove(self)
 class Stick:
     def __init__ (self,x,y,an,v,v1):
         self.x=x
         self.y=y
-        self.lenght = WIDTH/10
+        self.length = WIDTH/10
         self.an=an
         self.v=v
-        self.edge=(self.x+math.sin(self.an)*self.lenght,self.y-math.cos(self.an)*self.lenght)
+        self.edge=(self.x+math.sin(self.an)*self.length,self.y-math.cos(self.an)*self.length)
         self.vx=v * math.sin(self.an)+v1
         self.vy = - v * math.cos(self.an)
         self.color = choice(GAME_COLORS)
-        self.mindamage = 0.0045
-        self.maxdamage = 0.0055
+        self.density=0.15/(9**3)
+        self.std=1/7
+        self.mindamage = self.density*(5*self.length*5)*(1-self.std)
+        self.maxdamage = self.density*(5*self.length*5)*(1+self.std)
         self.live=1
         self.killtime=pygame.time.get_ticks()+230000
     def move(self):
         self.x+=self.vx
         self.y+=self.vy
-        self.edge=(self.x+math.sin(self.an)*self.lenght,self.y-math.cos(self.an)*self.lenght)
+        self.edge=(self.x+math.sin(self.an)*self.length,self.y-math.cos(self.an)*self.length)
         x,y=self.edge
         if self.v>0 and x>WIDTH:
             self.vx=0
@@ -192,6 +198,10 @@ class Gun:
         self.b=float(root_scalar(self.find_ellipse, bracket=[0, self.left]).root)
         self.hitbox=None
         self.fire_type=None
+        self.bombing=False
+        self.spellcard=None
+        self.spellcard_count=3
+        self.spell_name='Bouncy Hell'
     def get_rect(self):
         self.rect = pygame.Rect(self.x-self.left,self.y,2*self.left,self.bottom)
         #pygame.draw.rect(screen,RED,self.rect)
@@ -211,6 +221,12 @@ class Gun:
         c=math.sqrt(a1**2-b1**2)
         f=math.sqrt(b2**2+(k*b2-c)**2)+math.sqrt(b2**2+(k*b2+c)**2)-2*k*b1
         return f
+    def bomb(self):
+        if not self.bombing and self.spellcard_count>0:
+            self.bombing=True
+            self.invincible=True
+            self.spellcard=spellcards.Bomb1(self)
+            self.spellcard_count-=1
     def fire_start(self, event):
         if self.fire_type is None:
             if event.button==1:
@@ -228,8 +244,7 @@ class Gun:
         self.f2_on = 1
     def fire1_end(self):
         global balls
-        new_ball = Ball(self.screen,self.x,self.y)
-        new_ball.r += 5
+        new_ball = Ball(self.x,self.y)
         #self.an = math.atan2((event.pos[0] - new_ball.x), (new_ball.y - event.pos[1]))
         new_ball.vx = self.f2_power * math.sin(self.an)*0.7+self.v
         new_ball.vy = - self.f2_power * math.cos(self.an)*0.7
@@ -256,7 +271,7 @@ class Gun:
             self.color = RED
     def draw(self):
         # FIXIT don't know how to do it
-        if not self.invincible:
+        if not self.invincible or self.bombing:
             self.get_rect()
             pygame.draw.line(screen, self.color, (self.x,self.y),(self.x+math.sin(self.an)*self.f2_power,self.y-math.cos(self.an)*self.f2_power), width=5)
             pygame.draw.ellipse(screen, self.tank_color, self.rect)
@@ -264,9 +279,14 @@ class Gun:
             self.get_rect()
             pygame.draw.line(screen, self.color, (self.x,self.y),(self.x+math.sin(self.an)*self.f2_power,self.y-math.cos(self.an)*self.f2_power), width=5)
             pygame.draw.ellipse(screen, self.tank_color, self.rect)
-        elif pygame.time.get_ticks()-self.got_invincible>=self.invincible_time:
+        elif pygame.time.get_ticks()-self.got_invincible>=self.invincible_time and not self.bombing:
             self.invincible=False
     def power_up(self):
+        if self.bombing:
+            stop=self.spellcard.activate(balls,Ball)
+            if stop:
+                self.bombing=False
+                self.invincible=False
         if self.f2_on:
             if self.f2_power < WIDTH/20 and not self.cooldown:
                 self.f2_power += WIDTH/(60*FPS*1)
@@ -283,6 +303,7 @@ class Gun:
             self.invincible=False
         if not self.invincible:
             self.live-=1
+            self.spellcard_count=3
             if self.live==0:
                 self.deadend()
             explosion_waves.append(ExplosionWave(self.x,self.y))
@@ -413,7 +434,7 @@ class EvilGun(Gun):
             #print('started',self.y)
             self.f2_on = 1
     def fire_end(self):
-        new_ball = Ball(self.screen,self.x,self.y)
+        new_ball = Ball(self.x,self.y)
         #self.an = math.atan2((event.pos[0] - new_ball.x), (new_ball.y - event.pos[1]))
         vx = self.f2_power * math.sin(self.an)*0.7*self.speed_factor+self.v
         vy = - self.f2_power * math.cos(self.an)*0.7*self.speed_factor
@@ -510,12 +531,13 @@ class Boss:
     def move(self):
         pass
     def hit(self,ball):
-        pass
-        an=math.atan((ball.x-self.x)/(ball.y-self.y))
-        v=-ball.vy*math.cos(an)-ball.vx*math.sin(an)
-        mindamage=int(ball.mindamage*v**2)
-        maxdamage=int(ball.maxdamage*v**2)
-        self.live-=random.randint(mindamage,maxdamage)
+        an_ball=math.atan2((ball.x-self.x),(self.y-ball.y))
+        an_speed=math.atan2(ball.vx,-ball.vy)
+        v=-math.sqrt(ball.vy**2+ball.vx**2)*math.cos(an_speed-an_ball)
+        mindamage=ball.mindamage*v
+        maxdamage=ball.maxdamage*v
+        random.random()*(maxdamage-mindamage)
+        self.live-=mindamage+random.random()*(maxdamage-mindamage)
         balls.remove(ball)
         if self.live<=0:
             self.next_attack()      
@@ -533,6 +555,8 @@ class Boss1(Boss):
     def next_attack(self):
         global evilgun
         evilgun=None
+        for attack in self.attack_patterns:
+            attack.clear()
         try:
             if self.order>0:
                 explosion_waves.append(ExplosionWave(self.x,self.y))
@@ -557,9 +581,10 @@ class Boss1(Boss):
         self.attack_patterns.append(spellcards.SpellCard1(gun,self.x,self.y))
     def attack_2(self):
         self.attack_patterns=[]
+        self.spell_name=''
         self.live=70
         self.max_live=70
-        self.attack_patterns.append(spellcards.AttackPattern3(self.x,self.y,WIDTH/8,1,15,5,0.005,HEIGHT/50,15000))
+        self.attack_patterns.append(spellcards.AttackPattern3(self.x,self.y,WIDTH/8,1,15,6,0.0085,HEIGHT/50,15000))
     def spellcard_2(self):
         global evilgun
         self.attack_patterns=[]
@@ -588,6 +613,11 @@ def draw_lives():
     for i in range(gun.live-1,8):
         pygame.draw.circle(screen, BLACK, (WIDTH-WIDTH/7-7*WIDTH/80+i*WIDTH/40,HEIGHT/14), WIDTH/90)
     #draw_text('Lives', (WIDTH-WIDTH/7,HEIGHT/30), WIDTH//30, BLACK)
+def draw_bombs():
+    for i in range(0,gun.spellcard_count):
+        pygame.draw.circle(screen, GREEN, (WIDTH-WIDTH/7-7*WIDTH/80+i*WIDTH/40,HEIGHT/10), WIDTH/90)
+    for i in range(gun.spellcard_count,8):
+        pygame.draw.circle(screen, BLACK, (WIDTH-WIDTH/7-7*WIDTH/80+i*WIDTH/40,HEIGHT/10), WIDTH/90)
 def draw_health_bar(boss):
     k=max(0,boss.live/boss.max_live)
     pygame.draw.line(screen, BLACK, (WIDTH/60,HEIGHT/30),(WIDTH-WIDTH/60,HEIGHT/30), width=5)
@@ -667,7 +697,10 @@ while not finished:
         b.draw()
     for wave in explosion_waves:
         wave.draw()
+    if gun.bombing:
+        draw_text(gun.spell_name,(WIDTH/7,HEIGHT-HEIGHT/30), WIDTH//30, BLACK)
     draw_lives()
+    draw_bombs()
     #draw_text(f'{total_count}',(10,10),18)  
     pygame.display.update()
     if done:
@@ -698,6 +731,9 @@ while not finished:
         elif event.type == pygame.MOUSEBUTTONUP and gun.f2_on:
             gun.fire_end(event)
             shot_count+=1
+        elif event.type == pygame.KEYDOWN and event.key==pygame.K_s:
+            gun.bomb()
+            
     for target in targets:
         target.move()
         target.attack()

@@ -15,6 +15,40 @@ GREY = (125,125,125)
 GAME_COLORS = [RED, BLUE, YELLOW, GREEN, MAGENTA, CYAN]
 WIDTH = 700
 HEIGHT = 760
+class Bomb1:
+    def __init__(self,gun):
+        self.name='Bouncy hell'
+        self.gun=gun
+        self.v=25
+        self.period=800
+        self.count=4
+        self.launched=0
+        self.phase=random.random()*math.pi/7
+        self.last_scatter=pygame.time.get_ticks()-self.period
+        self.balls_count=13
+    def activate(self,balls,Ball):
+        stopped=False
+        if pygame.time.get_ticks()-self.last_scatter>=self.period:
+            self.last_scatter=pygame.time.get_ticks()
+            self.scatter(balls,Ball)
+            self.launched+=1
+            if self.launched==5:
+                stopped=True
+        return stopped
+    def scatter(self,balls,Ball):
+        phase=random.random()*2*math.pi/self.balls_count
+        for i in range(0,self.balls_count):
+            ball=Ball(self.gun.x,self.gun.y)
+            an=i*2*math.pi/self.balls_count+phase
+            ball.gy*=0.7
+            ball.vx = self.v * math.sin(an)+self.gun.v
+            ball.vy = - self.v * math.cos(an)
+            ball.mindamage*=0.1
+            ball.maxdamage*=0.1
+            #print(ball.mindamage,ball.maxdamage)
+            ball.speed_loss=0.1
+            balls.append(ball)
+    
 class AttackPattern1:
     def __init__(self,x,y,r,period,count1,count2,v,size,lifetime):
         self.first_delay=2500
@@ -40,6 +74,8 @@ class AttackPattern1:
             y1=self.y-math.cos(angle)*self.r
             bullet=bullet_types.CircleBullet1(self.v*math.sin(angle),-math.cos(angle)*self.v,x1,y1,self.size,self.lifetime)
             bullets.append(bullet)
+    def clear(self):
+        pass
 class AttackPattern3:
     def __init__(self,x,y,r,period,count,r_speed,rotate_speed,size,lifetime):    
         self.first_delay=2500
@@ -82,7 +118,17 @@ class AttackPattern3:
                 cluster[i].y=self.y-math.cos(angle)*cluster[0]
             if cluster[0]>2*HEIGHT:
                 self.clusters.remove(cluster)
-            
+    def clear(self):
+        for cluster in self.clusters:
+            radius=cluster.pop(0)
+            phase=cluster.pop(0)
+            direction=cluster.pop(0)
+            for bullet in cluster:
+                angle=cluster.index(bullet)*2*math.pi/self.count+phase
+                bullet.vx+=-math.sin(angle-math.pi/2)*direction*self.rotate_speed*radius
+                bullet.vy+=math.cos(angle-math.pi/2)*direction*self.rotate_speed*radius
+                bullet.vx+=math.sin(angle)*self.r_speed
+                bullet.vy+=-math.cos(angle)*self.r_speed
 class AttackPattern2:
     def __init__(self,x,y,period,v,size,gun):
         self.l,self.h1,self.h2=size
@@ -103,6 +149,8 @@ class AttackPattern2:
             self.last_shot=pygame.time.get_ticks()
     def scatter(self,bullets,an):
         bullets.append(bullet_types.ArrowBullet1(self.v,an,self.x,self.y,self.l,self.h1,self.h2))
+    def clear(self):
+        pass
 class SpellCard1:
     def __init__(self,gun,x,y):#,bullets):
         self.x=x
@@ -287,11 +335,13 @@ class SpellCard1:
                 self.act=None
                 exec(f'self.phase_{self.phase}_done=pygame.time.get_ticks()')
                 self.phase+=1
+    def clear(self):
+        pass
 class SpellCard2:
     def __init__(self,gun):
         self.gun=gun
         self.dead=False
-        self.delay=1500
+        self.delay=3000
         self.started=pygame.time.get_ticks()
     def activate(self,bullets):
         if not self.dead and pygame.time.get_ticks()-self.started>=self.delay:
@@ -305,4 +355,5 @@ class SpellCard2:
                 self.gun.fall()
             self.dead=self.gun.get_hit()
             self.dead=self.gun.get_hit_tank() or self.dead
-        
+    def clear(self):
+        pass        
