@@ -202,14 +202,21 @@ class Gun:
         self.spellcard=None
         self.spellcard_count=3
         self.spell_name='Bouncy Hell'
+        self.inverted=False
     def get_rect(self):
-        self.rect = pygame.Rect(self.x-self.left,self.y,2*self.left,self.bottom)
+        if not self.inverted:
+            self.rect = pygame.Rect(self.x-self.left,self.y,2*self.left,self.bottom)
+        else:
+            self.rect = pygame.Rect(self.x-self.bottom,self.y-self.left,self.bottom,2*self.left)
         #pygame.draw.rect(screen,RED,self.rect)
     def get_hitbox(self):
         b=self.b
         k=self.left/self.bottom/2
         a=b/k
-        rect=pygame.Rect(self.x-a,self.y+self.bottom/2-b,2*a,2*b)
+        if not self.inverted:
+            rect=pygame.Rect(self.x-a,self.y+self.bottom/2-b,2*a,2*b)
+        else:
+            rect=pygame.Rect(self.x-self.bottom/2-b,self.y-a,2*b,2*a)
         self.hitbox=rect
         keystate=pygame.key.get_pressed()
         if keystate[pygame.K_LSHIFT]:
@@ -224,6 +231,7 @@ class Gun:
     def bomb(self):
         if not self.bombing and self.spellcard_count>0:
             self.bombing=True
+            self.got_invincible=pygame.time.get_ticks()
             self.invincible=True
             self.spellcard=spellcards.Bomb1(self)
             self.spellcard_count-=1
@@ -246,8 +254,14 @@ class Gun:
         global balls
         new_ball = Ball(self.x,self.y)
         #self.an = math.atan2((event.pos[0] - new_ball.x), (new_ball.y - event.pos[1]))
-        new_ball.vx = self.f2_power * math.sin(self.an)*0.7+self.v
-        new_ball.vy = - self.f2_power * math.cos(self.an)*0.7
+        if self.inverted:
+            vx=0
+            vy=self.v
+        else:
+            vy=0
+            vx=self.v
+        new_ball.vx = self.f2_power * math.sin(self.an)*0.7+vx
+        new_ball.vy = - self.f2_power * math.cos(self.an)*0.7+vy
         balls.append(new_ball)
         self.f2_on = 0
         self.f2_power = WIDTH/60
@@ -329,11 +343,18 @@ class Gun:
             self.v=v
         else:
             self.v=0
-        self.x+=self.v
+        if not self.inverted:
+            self.x+=self.v
+        else:
+            self.y+=self.v
         if self.x<self.left:
             self.x=self.left
         elif self.x>WIDTH-self.right:
             self.x=WIDTH-self.right
+        if self.y<HEIGHT*2/5:
+            self.y=HEIGHT*2/5
+        elif self.y>HEIGHT-self.left and self.inverted:
+            self.y=HEIGHT-self.left
     def cooling(self):
         if self.cooldown:
             if pygame.time.get_ticks() - self.last_shot>=self.cooldown_time:
@@ -465,7 +486,7 @@ class ExplosionWave:
             explosion_waves.remove(self)
     def annihilate(self):
         for bullet in bullets:
-            if (bullet.x-self.x)**2 + (bullet.y-self.y)**2<=self.r**2:
+            if (bullet.x-self.x)**2 + (bullet.y-self.y)**2<=self.r**2 and not bullet.indestructible:
                 bullets.remove(bullet)
                 bullet.killed=True
     def draw(self):
@@ -540,15 +561,7 @@ class Boss:
         self.live-=mindamage+random.random()*(maxdamage-mindamage)
         balls.remove(ball)
         if self.live<=0:
-            self.next_attack()      
-class Boss1(Boss):
-    def __init__(self,x=WIDTH/2,y=HEIGHT*1/5,r=WIDTH/10):
-        Boss.__init__(self,x,y,r)
-        self.pull=['attack_1','spellcard_1','attack_2','spellcard_2']
-        self.order=0
-        self.attack_patterns=[]
-        self.name='Ball 1'
-        self.spell_name=''
+            self.next_attack()
     def attack(self):
         for attack in self.attack_patterns:
             attack.activate(bullets)
@@ -556,7 +569,7 @@ class Boss1(Boss):
         global evilgun
         evilgun=None
         for attack in self.attack_patterns:
-            attack.clear()
+            attack.clear(bullets)
         try:
             if self.order>0:
                 explosion_waves.append(ExplosionWave(self.x,self.y))
@@ -564,9 +577,15 @@ class Boss1(Boss):
             self.order+=1
         except Exception as e:
             #self.live=0
-            #global evilgun
-            #evilgun=None
             print(e)
+class Boss2(Boss):
+    def __init__(self,x=WIDTH/2,y=HEIGHT*1/5,r=WIDTH/10):
+        Boss.__init__(self,x,y,r)
+        self.pull=['attack_1','spellcard_1','attack_2','spellcard_2']
+        self.order=0
+        self.attack_patterns=[]
+        self.name='Ball 1'
+        self.spell_name=''
     def attack_1(self):
         self.attack_patterns=[]
         self.spell_name=''
@@ -594,8 +613,27 @@ class Boss1(Boss):
         evilgun=EvilGun(screen,self.x,self.y)
         self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.4,6,(WIDTH/40,WIDTH/30,WIDTH/80),gun))
         self.attack_patterns.append(spellcards.SpellCard2(evilgun))    
-    
-
+class Boss1(Boss):
+    def __init__(self,x=WIDTH/2,y=HEIGHT*1/5,r=WIDTH/10):
+        Boss.__init__(self,x,y,r)
+        self.pull=['spellcard_2','spellcard_1','spellcard_3','spellcard_4']
+        self.order=0
+        self.attack_patterns=[]
+        self.name='Ball 2'
+        self.spell_name=''
+    def spellcard_1(self):
+        self.attack_patterns=[]
+        self.spell_name='Inviolable Border'
+        self.live=70
+        self.max_live=70
+        self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.7,7,(WIDTH/60,WIDTH/30,WIDTH/80),gun))
+        self.attack_patterns.append(spellcards.SpellCard3(gun))
+    def spellcard_2(self):
+        self.attack_patterns=[]
+        self.spell_name='Anomaly: Rotated Space'
+        self.live=70
+        self.max_live=70
+        self.attack_patterns.append(spellcards.SpellCard4(gun))
             
 def next_boss(number):
     try:

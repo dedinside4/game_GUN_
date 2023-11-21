@@ -25,9 +25,14 @@ class Bullet:
         self.lifetime=lifetime
         self.birthtime=pygame.time.get_ticks()
         self.killed=False
+        self.indestructible=False
+        self.disturbed=False
     def hit_ball(self,ball,bullets):
-        bullets.remove(self)
-        self.killed=True
+        if not self.indestructible:
+            bullets.remove(self)
+            self.killed=True
+        elif not self.disturbed:
+            self.disturbed=True
     def hit_tank(self,bullets,gun):
         try:
             bullets.remove(self)
@@ -39,11 +44,15 @@ class Bullet:
     def move(self,bullets):
         self.x+=self.vx
         self.y+=self.vy
-        if self.x>2*WIDTH or self.x<-WIDTH or self.y>2*HEIGHT or self.y<-HEIGHT or pygame.time.get_ticks()-self.birthtime>=self.lifetime:
+        if self.x>13*WIDTH or self.x<-13*WIDTH or self.y>13*HEIGHT or self.y<-13*HEIGHT or pygame.time.get_ticks()-self.birthtime>=self.lifetime:
             try:
                 bullets.remove(self)
             except:
                 pass
+    def tank_hittest(self,gun):
+        self.get_rect()
+        collision=self.rect.colliderect(gun.hitbox)
+        return collision
 class CircleBullet1(Bullet):
     def __init__(self,vx,vy,x,y,r,lifetime=20000,color=RED):
         Bullet.__init__(self,vx,vy,x,y,lifetime)
@@ -55,10 +64,6 @@ class CircleBullet1(Bullet):
         return obj.hittest((self.x,self.y,self.r))
     def get_rect(self):
         self.rect=pygame.Rect(self.x-self.r/math.sqrt(2),self.y-self.r/math.sqrt(2),2*self.r/math.sqrt(2),2*self.r/math.sqrt(2))
-    def tank_hittest(self,gun):
-        self.get_rect()
-        collision=self.rect.colliderect(gun.hitbox)
-        return collision
     def draw(self,screen):
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.r)
 class ArrowBullet1(Bullet):
@@ -85,10 +90,6 @@ class ArrowBullet1(Bullet):
         x=self.x+self.r2*math.sin(self.an)
         y=self.y-self.r2*math.cos(self.an)
         self.rect=pygame.Rect(x-self.r2,y-self.r2,2*self.r2,2*self.r2)
-    def tank_hittest(self,gun):
-        self.get_rect()
-        collision=self.rect.colliderect(gun.hitbox)
-        return collision
     def ball_hittest(self,obj):
         x=self.x+self.h3*math.sin(self.an)
         y=self.y-self.h3*math.cos(self.an)
@@ -109,3 +110,96 @@ class ArrowBullet1(Bullet):
         #pygame.draw.circle(screen, YELLOW, (x4,y4), self.r1)
         pygame.draw.polygon(screen,self.color,((x1,y1),(x2,y2),(x3,y3),self.edge))
         #pygame.draw.rect(screen,RED,self.rect)
+class Train(Bullet):
+    def __init__(self,v,direction,y,count,delay,color=BLACK,lifetime=4000):
+        self.vx=v*direction
+        self.direction=direction
+        offset=(delay/1000*120)*v
+        self.x=(-offset if direction==1 else WIDTH+offset)
+        self.color=color
+        self.height=HEIGHT/40
+        self.y=y-self.height/2
+        self.count=count
+        self.wagon_length=WIDTH/7
+        self.cord_length=self.wagon_length/24
+        self.length=self.wagon_length*count+self.cord_length*(count-1)
+        Bullet.__init__(self,self.vx,0,self.x,self.y,lifetime)
+    def get_rect(self):
+        x=min(self.x,self.x-self.direction*self.length)
+        self.rect=pygame.Rect(x,self.y-self.height/2,self.length,self.height)
+    def ball_hittest(self,obj):
+        x=self.x-self.wagon_length*self.direction/2
+        for i in range(0,self.count):
+            collision=obj.hittest((x-i*(self.wagon_length+self.cord_length)*self.direction,self.y,self.wagon_length/2))
+            if collision:
+                break
+        return collision
+    def draw(self,screen):
+        x=self.x-self.wagon_length*self.direction/2
+        #pygame.draw.rect(screen,RED,self.rect)
+        for i in range(0,self.count):
+            pygame.draw.rect(screen,self.color,(x-i*(self.wagon_length+self.cord_length)*self.direction-self.wagon_length/2,self.y-self.height/2,self.wagon_length,self.height))
+            if i<self.count-1:
+                pygame.draw.line(screen,self.color,(x-(i*(self.wagon_length+self.cord_length)+self.wagon_length/2)*self.direction,self.y+self.height/3),(x-(i*(self.wagon_length+self.cord_length)+self.wagon_length/2+self.cord_length)*self.direction,self.y+self.height/3),width=3)
+            elif i==0:
+                pygame.draw.line(screen,self.color,(x+self.wagon_length*self.direction/3,self.y-self.height/2),(x+self.wagon_length*self.direction/3,self.y-self.height/2-self.height/4),width=4)
+class Gap:
+    def __init__(self,x,y,height,width,bullets,lifetime=1000,color=MAGENTA):
+        self.x=x
+        self.y=y
+        self.lifetime=lifetime
+        self.color=color
+        self.height=height
+        self.width=width
+        self.opening_time=400
+        self.created=pygame.time.get_ticks()
+        self.closed=None
+        self.closing=False
+        self.k=0.0001
+        self.indestructible=True
+        self.bullets=bullets
+        print('')
+    def close(self):
+        self.closing=True
+        self.closed=pygame.time.get_ticks()
+    def draw(self,screen):
+        rect=pygame.Rect(self.x-self.k*self.width/2,self.y-self.height/2,self.k*self.width,self.height)
+        pygame.draw.ellipse(screen, self.color, rect)
+    def ball_hittest(self,obj):
+        collision=obj.hittest((self.x-self.k*self.width/2,self.y-self.height/2,self.height/2))
+        if collision:
+            obj.x=13*WIDTH
+            obj.y=13*WIDTH
+            obj.vx=0
+            obj.vy=0
+        return False
+    def hit_ball(self,ball,bullets):
+        bullets.remove(self)
+    def hit_tank(self,bullets,gun):
+        pass
+    def tank_hittest(self,gun):
+        if not self.closing:
+            self.k=min((pygame.time.get_ticks()-self.created)/self.opening_time,1)
+            if pygame.time.get_ticks()-self.created>=self.lifetime:
+                self.close()
+        else:
+            self.k=max(1-(pygame.time.get_ticks()-self.closed)/self.opening_time,0)
+        if self.k==0:
+            self.disappear()
+        return False
+    def move(self,bullets):
+        pass
+    def disappear(self):
+        self.bullets.remove(self)
+
+
+
+
+
+
+
+
+
+
+
+            

@@ -74,7 +74,7 @@ class AttackPattern1:
             y1=self.y-math.cos(angle)*self.r
             bullet=bullet_types.CircleBullet1(self.v*math.sin(angle),-math.cos(angle)*self.v,x1,y1,self.size,self.lifetime)
             bullets.append(bullet)
-    def clear(self):
+    def clear(self,bullets):
         pass
 class AttackPattern3:
     def __init__(self,x,y,r,period,count,r_speed,rotate_speed,size,lifetime):    
@@ -118,7 +118,7 @@ class AttackPattern3:
                 cluster[i].y=self.y-math.cos(angle)*cluster[0]
             if cluster[0]>2*HEIGHT:
                 self.clusters.remove(cluster)
-    def clear(self):
+    def clear(self,bullets):
         for cluster in self.clusters:
             radius=cluster.pop(0)
             phase=cluster.pop(0)
@@ -149,7 +149,7 @@ class AttackPattern2:
             self.last_shot=pygame.time.get_ticks()
     def scatter(self,bullets,an):
         bullets.append(bullet_types.ArrowBullet1(self.v,an,self.x,self.y,self.l,self.h1,self.h2))
-    def clear(self):
+    def clear(self,bullets):
         pass
 class SpellCard1:
     def __init__(self,gun,x,y):#,bullets):
@@ -335,7 +335,7 @@ class SpellCard1:
                 self.act=None
                 exec(f'self.phase_{self.phase}_done=pygame.time.get_ticks()')
                 self.phase+=1
-    def clear(self):
+    def clear(self,bullets):
         pass
 class SpellCard2:
     def __init__(self,gun):
@@ -355,5 +355,117 @@ class SpellCard2:
                 self.gun.fall()
             self.dead=self.gun.get_hit()
             self.dead=self.gun.get_hit_tank() or self.dead
-    def clear(self):
+    def clear(self,bullets):
         pass        
+class SpellCard3:
+    def __init__(self,gun):
+        self.target=gun
+        self.standart_r=WIDTH/2
+        self.r=self.standart_r
+        self.exist=False
+        self.speed=16
+        self.narrowing_speed=0.008
+        self.bullets=[]
+        self.creation_period=50
+        self.deployed=pygame.time.get_ticks()
+        self.last_created=pygame.time.get_ticks()
+        self.count=35
+        self.delay=1300
+    def activate(self,bullets):
+        if not self.exist and pygame.time.get_ticks()-self.deployed>=self.delay:
+            self.create(bullets)
+        else:
+            self.violation_check()
+        self.update()
+    def create(self,bullets):
+        if pygame.time.get_ticks()-self.last_created>=self.creation_period and len(self.bullets)<self.count:
+            count=len(self.bullets)
+            angle=count*2*math.pi/self.count
+            x=self.target.x+self.r*math.sin(angle)
+            y=self.target.y-self.r*math.cos(angle)
+            bullet=bullet_types.ArrowBullet1(0,angle+math.pi,x,y,WIDTH/30,0,WIDTH/30,lifetime=3000000)
+            bullet.indestructible=True
+            bullets.append(bullet)
+            self.bullets.append(bullet)
+            self.last_created=pygame.time.get_ticks()
+            if len(self.bullets)==self.count:
+                self.exist=True
+    def update(self):
+        self.r-=self.narrowing_speed
+        for i in range(0,len(self.bullets)):
+            angle=i*2*math.pi/self.count
+            self.bullets[i].x=self.target.x+self.r*math.sin(angle)
+            self.bullets[i].y=self.target.y-self.r*math.cos(angle)
+        
+    def violation_check(self):
+        for bullet in self.bullets:
+            if bullet.disturbed==True:
+                self.no_violation_allowed()
+                break
+    def no_violation_allowed(self):
+        self.deployed=pygame.time.get_ticks()
+        for bullet in self.bullets:
+            bullet.v=self.speed
+            bullet.get_speed()
+        self.r=self.standart_r
+        self.bullets=[]
+        self.exist=False
+    def clear(self,bullets):
+        for bullet in self.bullets:
+            bullets.remove(bullet)
+class SpellCard4:
+    def __init__(self,gun):
+        self.target=gun
+        self.delay=800
+        self.std=self.delay/7
+        self.last_deployed=pygame.time.get_ticks()
+        self.max_height=4*HEIGHT/5
+        #self.target.x+=self.target.bottom/2
+        self.target.y=HEIGHT-self.target.left
+        self.target.inverted=True
+        self.trains=[]
+        self.sections=8
+        self.section_length=self.max_height/self.sections
+    def activate(self,bullets):
+        if pygame.time.get_ticks()-self.last_deployed>=self.delay+random.choice((-1,1))*self.std*random.random():
+            self.last_deployed=pygame.time.get_ticks()
+            self.deploy(bullets)
+    def deploy(self,bullets):
+        for train in self.trains:
+            if bullets.count(train[0])==0:
+                self.trains.remove(train)
+        try:
+            section=random.choice(list(filter(self.is_section_free,[i*2 for i in range(0,self.sections//2)])))
+            height=HEIGHT-(section+random.random())*self.section_length
+            train=bullet_types.Train(13,random.choice((1,-1)),height,15,430)
+            gap1=bullet_types.Gap(WIDTH/170,train.y,HEIGHT/30,WIDTH/100,bullets,(train.length+WIDTH)/abs(train.vx)/120*1000+450)
+            gap2=bullet_types.Gap(WIDTH-WIDTH/170,train.y,HEIGHT/30,WIDTH/100,bullets,(train.length+WIDTH)/abs(train.vx)/120*1000+450)
+            bullets.append(train)
+            bullets.append(gap1)
+            bullets.append(gap2)
+            self.trains.append((train,gap1,gap2))
+        except:
+            pass
+    def clear(self,bullets):
+        self.target.inverted=False
+        self.target.y=HEIGHT-self.target.bottom
+    def is_section_free(self,number):
+        free=True
+        for train,g1,g2 in self.trains:
+            if train.y<=HEIGHT-self.section_length*number and train.y>=HEIGHT-self.section_length*(number+1):
+                free=False
+        return free
+                
+
+
+
+
+
+
+
+
+
+
+
+
+            
