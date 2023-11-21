@@ -128,9 +128,8 @@ class Train(Bullet):
         x=min(self.x,self.x-self.direction*self.length)
         self.rect=pygame.Rect(x,self.y-self.height/2,self.length,self.height)
     def ball_hittest(self,obj):
-        x=self.x-self.wagon_length*self.direction/2
         for i in range(0,self.count):
-            collision=obj.hittest((x-i*(self.wagon_length+self.cord_length)*self.direction,self.y,self.wagon_length/2))
+            collision=obj.hittest((x-i*(self.wagon_length+self.cord_length)*self.direction-self.wagon_length/2,self.y-self.height/2,self.wagon_lenght,self.height))
             if collision:
                 break
         return collision
@@ -143,6 +142,39 @@ class Train(Bullet):
                 pygame.draw.line(screen,self.color,(x-(i*(self.wagon_length+self.cord_length)+self.wagon_length/2)*self.direction,self.y+self.height/3),(x-(i*(self.wagon_length+self.cord_length)+self.wagon_length/2+self.cord_length)*self.direction,self.y+self.height/3),width=3)
             elif i==0:
                 pygame.draw.line(screen,self.color,(x+self.wagon_length*self.direction/3,self.y-self.height/2),(x+self.wagon_length*self.direction/3,self.y-self.height/2-self.height/4),width=4)
+class Shell(Bullet):
+    def __init__(self,vy,vx,x,y,l,h1,h2,color=BLACK,lifetime=5000):
+        self.vy=vy
+        self.vx=vx
+        Bullet.__init__(self,self.vx,self.vy,x,y,lifetime)
+        self.l=l
+        self.h1=h1
+        self.h2=h2
+        self.color=color
+        self.rect=None
+        self.edge=(self.x,self.y+self.h2)
+    def get_rect(self):
+        self.rect=pygame.Rect(self.x-self.l,self.y,2*self.l,self.h1)
+    def ball_hittest(self,obj):
+        x=self.x
+        y=self.y+self.h1/2
+        collision=obj.hittest((x,y,self.l))
+        if collision:
+            self.killed=True
+        return collision
+    def draw(self,screen):
+        x1=self.x-self.l
+        y1=self.y
+        x2=self.x+self.l
+        y2=self.y
+        x3=self.x+self.l
+        y3=self.y+self.h1
+        x5=self.x-self.l
+        y5=self.y+self.h1
+        self.edge=(self.x,self.y+self.h2)
+        pygame.draw.polygon(screen,self.color,((x1,y1),(x2,y2),(x3,y3),self.edge,(x5,y5)))
+        #pygame.draw.rect(screen,RED,self.rect)
+        #pygame.draw.circle(screen, YELLOW, (self.x,self.y+self.h1/2), self.l)
 class Gap:
     def __init__(self,x,y,height,width,bullets,lifetime=1000,color=MAGENTA):
         self.x=x

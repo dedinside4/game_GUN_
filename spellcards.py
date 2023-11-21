@@ -341,7 +341,7 @@ class SpellCard2:
     def __init__(self,gun):
         self.gun=gun
         self.dead=False
-        self.delay=3000
+        self.delay=2500
         self.started=pygame.time.get_ticks()
     def activate(self,bullets):
         if not self.dead and pygame.time.get_ticks()-self.started>=self.delay:
@@ -364,15 +364,16 @@ class SpellCard3:
         self.r=self.standart_r
         self.exist=False
         self.speed=16
-        self.narrowing_speed=0.008
+        self.narrowing_speed=0.01
         self.bullets=[]
         self.creation_period=50
         self.deployed=pygame.time.get_ticks()
         self.last_created=pygame.time.get_ticks()
         self.count=35
-        self.delay=1300
+        self.delay=2500
     def activate(self,bullets):
         if not self.exist and pygame.time.get_ticks()-self.deployed>=self.delay:
+            self.delay=1300
             self.create(bullets)
         else:
             self.violation_check()
@@ -416,7 +417,7 @@ class SpellCard3:
 class SpellCard4:
     def __init__(self,gun):
         self.target=gun
-        self.delay=800
+        self.delay=2500
         self.std=self.delay/7
         self.last_deployed=pygame.time.get_ticks()
         self.max_height=4*HEIGHT/5
@@ -428,6 +429,7 @@ class SpellCard4:
         self.section_length=self.max_height/self.sections
     def activate(self,bullets):
         if pygame.time.get_ticks()-self.last_deployed>=self.delay+random.choice((-1,1))*self.std*random.random():
+            self.delay=600
             self.last_deployed=pygame.time.get_ticks()
             self.deploy(bullets)
     def deploy(self,bullets):
@@ -455,9 +457,61 @@ class SpellCard4:
             if train.y<=HEIGHT-self.section_length*number and train.y>=HEIGHT-self.section_length*(number+1):
                 free=False
         return free
-                
-
-
+class SpellCard5:
+    def __init__(self,guns):
+        self.guns=guns
+        self.dead=False
+        self.delay=2500
+        self.started=pygame.time.get_ticks()
+        self.gaps=[]
+        self.shells=[]
+        self.explosions=[]
+        self.wave_expansion_time=30
+        self.r_shard=WIDTH/50
+        self.count_shard=17
+    def activate(self,bullets):
+        if pygame.time.get_ticks()-self.started>=self.delay:
+            if len(self.gaps)==0:
+                for gun in self.guns:
+                    gap1=bullet_types.Gap(WIDTH/170,gun.y+gun.bottom/2,gun.bottom*1.3,WIDTH/100,bullets,12300000)
+                    gap2=bullet_types.Gap(WIDTH-WIDTH/170,gun.y+gun.bottom/2,gun.bottom*1.3,WIDTH/100,bullets,12300000)
+                    self.gaps.append(gap1)
+                    self.gaps.append(gap2)
+                    bullets.append(gap1)
+                    bullets.append(gap2)
+            for gun in self.guns:
+                gun.move()
+                gun.targetting()
+                if gun.deployed:
+                    gun.fire_start()
+                    shell=gun.power_up()
+                    gun.cooling()
+                    gun.get_hit()
+                    if not shell is None:
+                        self.shells.append(shell)
+            self.check_shells(bullets)
+            self.explode(bullets)
+    def clear(self,bullets):
+        for gap in self.gaps:
+            gap.lifetime=0
+    def check_shells(self,bullets):
+        for shell in self.shells:
+            x,y=shell.edge
+            if y>HEIGHT:
+                self.explosions.append([shell,0,pygame.time.get_ticks()-12333])
+                bullets.remove(shell)
+                self.shells.remove(shell)
+    def explode(self,bullets):
+        shell,stage,last_time=0,1,2
+        for exp in self.explosions:
+            if pygame.time.get_ticks()-exp[2]>=self.wave_expansion_time and exp[1]<5:
+                exp[1]+=1
+                shard=AttackPattern1(exp[0].x,exp[0].y,exp[1]*self.r_shard,1000,exp[1]*self.count_shard,exp[1]*self.count_shard,0,WIDTH/100,self.wave_expansion_time)
+                shard.scatter(bullets)
+                exp[2]=pygame.time.get_ticks()
+                if exp[1]>5:
+                    self.explosions.remove(exp)
+    
 
 
 
