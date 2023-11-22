@@ -482,7 +482,7 @@ class Dora(Gun):
         self.cooldown=True
         self.cooldown_time=random.uniform(self.min_cooldown,self.max_cooldown)
         self.last_shot=pygame.time.get_ticks()
-        pygame.mixer.Sound('normal_shot.mp3').play()
+        play_normal_shot()
         return new_bullet
     def power_up(self):
         shell=None
@@ -512,7 +512,7 @@ class EvilGun(Gun):
                 self.landed=True
     def get_hit_tank(self):
         dead=False
-        if gun.x-gun.left>=self.x and gun.x-gun.left<=self.x+self.left:
+        if gun.x-gun.left>=self.x-self.left and gun.x-gun.left<=self.x+self.left:
             gun.get_hit()
             if not self.invincible:
                 self.live-=1
@@ -523,7 +523,7 @@ class EvilGun(Gun):
                     self.dead_end()
                 play_death_sound()
             gun.x=self.x+self.left+gun.left
-        elif gun.x+gun.left<=self.x and gun.x+gun.left>=self.x-self.left:
+        elif gun.x+gun.left<=self.x+self.left and gun.x+gun.left>=self.x-self.left:
             gun.get_hit()
             if not self.invincible:
                 self.live-=1
@@ -595,7 +595,7 @@ class EvilGun(Gun):
         self.cooldown=True
         self.cooldown_time=5000
         self.last_shot=pygame.time.get_ticks()
-        pygame.mixer.Sound('normal_shot.mp3').play()
+        play_normal_shot()
     def power_up(self):
         if self.f2_on:
             if self.f2_power < WIDTH/20:
@@ -628,7 +628,7 @@ class Target:
         self.live = 1
         # FIXME: don't work!!! How to call this functions when object is created?
         self.new_target()
-
+        self.max_live=1
     def new_target(self):
         """ Инициализация новой цели."""
         self.x = rnd(600, 780)
@@ -675,9 +675,9 @@ class Boss:
         self.y=y
         self.r=r
         self.color=RED
-        self.live=None
+        self.live=3
         self.attack_pattern=None
-        self.max_live=None
+        self.max_live=3
         #self.pattern=1
     def draw(self):
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.r)
@@ -748,7 +748,7 @@ class Boss1(Boss):
         self.live=70
         self.max_live=70
         evilgun=EvilGun(screen,self.x,self.y)
-        self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.4,6,(WIDTH/40,WIDTH/30,WIDTH/80),gun))
+        #self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.4,6,(WIDTH/40,WIDTH/30,WIDTH/80),gun))
         self.attack_patterns.append(spellcards.SpellCard2(evilgun))    
 class Boss2(Boss):
     def __init__(self,x=WIDTH/2,y=HEIGHT*1/5,r=WIDTH/10):
@@ -792,32 +792,37 @@ class Boss2(Boss):
         self.attack_patterns.append(spellcards.SpellCard5(railguns))
 class StickShotSound:
     def __init__(self,sounds):
-        self.sound=pygame.mixer.Sound('railgun_shot.mp3')
+        self.sound=pygame.mixer.Sound('sounds/railgun_shot.mp3')
         sounds.append(self)
         self.created=pygame.time.get_ticks()
         self.playing=False
     def fadeout(self,sounds):
         if pygame.time.get_ticks()-self.created>=2500:
-            self.sound.fadeout(4000)
+            self.sound.fadeout(3000)
             sounds.remove(self)
     def play(self):
         self.sound.play()
         self.playing=True
+    def set_volume(self,volume):
+        self.sound.set_volume(volume)
 class NormalShotSound:
     def __init__(self,sounds):
-        self.sound=pygame.mixer.Sound('normal_shot.mp3')
-        self.sound.set_volume(0.8)
+        self.sound=pygame.mixer.Sound('sounds/normal_shot.mp3')
         sounds.append(self)
         self.created=pygame.time.get_ticks()
         self.playing=False
     def fadeout(self,sounds):
-        pass
+        if pygame.time.get_ticks()-self.created>=3000:
+            self.sound.fadeout(2000)
+            sounds.remove(self)
     def play(self):
         self.sound.play()
         self.playing=True
+    def set_volume(self,volume):
+        self.sound.set_volume(volume)
 class DeathSound:
     def __init__(self,sounds):
-        self.sound=pygame.mixer.Sound('tank_explosion.mp3')
+        self.sound=pygame.mixer.Sound('sounds/tank_explosion.mp3')
         sounds.append(self)
         self.created=pygame.time.get_ticks()
         self.playing=False
@@ -828,14 +833,18 @@ class DeathSound:
     def play(self):
         self.sound.play()
         self.playing=True
-    
+    def set_volume(self,volume):
+        self.sound.set_volume(volume)
 def next_boss(number):
     try:
         print(number)
         b=eval('Boss'+str(number)+'()')
         b.next_attack()
         targets.append(b)
-        #set_music(boss_music[number])
+        try:
+            set_music(boss_music[number-1])
+        except:
+            pass
     except:
         game_over()
 font_name=pygame.font.match_font('arial')
@@ -889,6 +898,7 @@ def offer_continue():
     pygame.display.update()
     for channel in channels:
         channel.pause()
+    pygame.mixer.music.pause()
     while paused:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -904,14 +914,18 @@ def offer_continue():
                 elif event.key==pygame.K_n:
                     paused=False
                     game_over()
+    pygame.mixer.music.unpause()
 def game_over():
     global finished
+    pygame.music.stop()
     screen.fill(BLACK)
     draw_text("GAME OVER",(WIDTH/2,HEIGHT/2),WIDTH//10,RED)
     pygame.display.update()
     pygame.time.delay(1000)
     finished=True
 def pause():
+    global sound_volume
+    global music_volume
     global afterpause
     print('paused')
     global finished
@@ -921,16 +935,47 @@ def pause():
     pygame.display.update()
     for channel in channels:
         channel.pause()
+    pygame.mixer.music.pause()
+    start=WIDTH/3
+    length=4*WIDTH/5-start
+    music_ch=False
+    sound_ch=False
     while paused:
+        screen.fill(BLACK)
+        draw_text("Громкость звуков",(WIDTH/6.5,2*HEIGHT/5),WIDTH//30,WHITE)
+        pygame.draw.line(screen,GREEN,(start,2*HEIGHT/5),(start+length,2*HEIGHT/5),width=8)
+        pygame.draw.circle(screen,MAGENTA,(start+length*sound_volume,2*HEIGHT/5),6)
+        draw_text(str(int(sound_volume*100))+'%',(start+length+WIDTH/20,2*HEIGHT/5),WIDTH//30,WHITE)
+        draw_text("Громкость музыки",(WIDTH/6.5,3*HEIGHT/5),WIDTH//30,WHITE)
+        pygame.draw.line(screen,GREEN,(start,3*HEIGHT/5),(start+length,3*HEIGHT/5),width=8)
+        pygame.draw.circle(screen,MAGENTA,(start+length*music_volume,3*HEIGHT/5),6)
+        draw_text(str(int(music_volume*100))+'%',(start+length+WIDTH/20,3*HEIGHT/5),WIDTH//30,WHITE)
+        pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 finished = True
                 paused=False
             elif event.type == pygame.KEYDOWN and event.key==pygame.K_ESCAPE:
                 paused=False
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button==1:
+                if abs(event.pos[1]-2*HEIGHT/5)<=7 and event.pos[0]<=start+length+6 and event.pos[0]>=start-6:
+                    sound_ch=True
+                if abs(event.pos[1]-3*HEIGHT/5)<=7 and event.pos[0]<=start+length+6 and event.pos[0]>=start-6:
+                    music_ch=True
+            elif event.type == pygame.MOUSEBUTTONUP and event.button==1:
+                music_ch=False
+                sound_ch=False
+        if music_ch:
+            x,y=pygame.mouse.get_pos()
+            x=max(min(x,start+length),start)
+            music_volume=(x-start)/length
+        elif sound_ch:
+            x,y=pygame.mouse.get_pos()
+            x=max(min(x,start+length),start)
+            sound_volume=(x-start)/length
     for channel in channels:
         channel.unpause()
-    
+    pygame.mixer.music.unpause() 
 pygame.init()
 pygame.mixer.init()
 #print(pygame.mixer.get_num_channels())
@@ -943,7 +988,7 @@ bullet = 0
 balls = []
 bullets = []
 targets = []
-boss_music = []
+boss_music = ['sounds/the_rabbit_has_landed.wav']
 boss = 6*[(WIDTH/2,HEIGHT*1/5,WIDTH/10)]
 clock = pygame.time.Clock()
 explosion_waves=[]
@@ -963,6 +1008,8 @@ fps=clock.get_fps()
 boss_number=1
 afterpause=False
 last_played=pygame.time.get_ticks()
+sound_volume=1
+music_volume=0.2
 while not finished:
     screen.fill(WHITE)
     gun.draw()
@@ -978,7 +1025,7 @@ while not finished:
         if target.live:
             target.draw()
             done=False
-        if type(target)==type(eval(f'Boss{boss_number}()')):
+        if target.max_live>1:
             draw_health_bar(target)
             draw_text(target.spell_name, (WIDTH-WIDTH/7,HEIGHT/70), WIDTH//43, BLACK)
     for bullet in bullets:
@@ -999,10 +1046,12 @@ while not finished:
     for sound in sounds:
         #print(type(sound),type(sounds))
         sound.fadeout(sounds)
+        sound.set_volume(sound_volume)
         if pygame.time.get_ticks()-last_played>=110 and not sound.playing:
             last_played=pygame.time.get_ticks()
             sound.play()
             break
+    pygame.mixer.music.set_volume(music_volume)
     if done:
         #end_music()
         balls = []
@@ -1014,12 +1063,12 @@ while not finished:
         done=False
         level+=1
         if level%5==0:
-            next_boss(boss_number)
+            next_boss(level//5)
         elif level==11:
             game_over()
         else:
             for target in targets:
-                if type(target) is type(eval(f'Boss{boss_number}()')):
+                if target.max_live>1:
                     boss_number+=1
                     targets.remove(target)
                 else:
@@ -1072,5 +1121,5 @@ while not finished:
         gun.targetting(list(pygame.mouse.get_pos()))
         gun.cooling()
         gun.power_up()
-
+pygame.mixer.quit()
 pygame.quit()

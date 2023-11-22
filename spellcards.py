@@ -415,7 +415,7 @@ class SpellCard2:
     def __init__(self,gun):
         self.gun=gun
         self.dead=False
-        self.delay=2500
+        self.delay=1800
         self.started=pygame.time.get_ticks()
     def activate(self,bullets):
         if not self.dead and pygame.time.get_ticks()-self.started>=self.delay:
