@@ -128,8 +128,9 @@ class Train(Bullet):
         x=min(self.x,self.x-self.direction*self.length)
         self.rect=pygame.Rect(x,self.y-self.height/2,self.length,self.height)
     def ball_hittest(self,obj):
+        x=self.x-self.wagon_length*self.direction/2
         for i in range(0,self.count):
-            collision=obj.hittest((x-i*(self.wagon_length+self.cord_length)*self.direction-self.wagon_length/2,self.y-self.height/2,self.wagon_lenght,self.height))
+            collision=obj.hittest((x-i*(self.wagon_length+self.cord_length)*self.direction-self.wagon_length/2,self.y-self.height/2,self.wagon_length,self.height))
             if collision:
                 break
         return collision

@@ -20,7 +20,7 @@ class Bomb1:
         self.name='Bouncy hell'
         self.gun=gun
         self.v=25
-        self.period=800
+        self.period=500
         self.count=4
         self.launched=0
         self.phase=random.random()*math.pi/7
@@ -151,6 +151,80 @@ class AttackPattern2:
         bullets.append(bullet_types.ArrowBullet1(self.v,an,self.x,self.y,self.l,self.h1,self.h2))
     def clear(self,bullets):
         pass
+class AttackPattern4:
+    def __init__(self,x,y,period,count,v,size,lifetime=2000):
+        self.first_delay=2500
+        self.last_shot=pygame.time.get_ticks()+self.first_delay
+        self.delay=period*1000
+        self.v=v
+        self.count=count
+        self.phase=random.random()*2*math.pi/self.count
+        self.x=x
+        self.y=y
+        self.size=size
+        self.lifetime=lifetime
+    def activate(self,bullets):
+        if pygame.time.get_ticks() - self.last_shot>=self.delay:
+            self.phase=random.random()*2*math.pi/self.count
+            self.scatter(bullets)
+            self.last_shot=pygame.time.get_ticks()
+    def scatter(self,bullets):
+        for i in range(0,self.count):
+            angle=i*2*math.pi/self.count+self.phase
+            l,h1,h2=self.size
+            bullet=bullet_types.ArrowBullet1(self.v,angle,self.x,self.y,l,h1,h2,lifetime=self.lifetime)
+            bullets.append(bullet)
+    def clear(self,bullets):
+        pass
+class AttackPattern5:
+    def __init__(self,y,period,count,v,size,lifetime=3000):
+        self.first_delay=2500
+        self.last_shot=pygame.time.get_ticks()+self.first_delay
+        self.delay=period*1000
+        self.v=v
+        self.count=count
+        self.distance=WIDTH/(self.count)
+        self.y=y
+        self.size=size
+        self.lifetime=lifetime
+        self.bullets=[]
+        self.max_relocations=3
+    def activate(self,bullets):
+        self.relocate(bullets)
+        if pygame.time.get_ticks() - self.last_shot>=self.delay:
+            self.scatter(bullets)
+            self.last_shot=pygame.time.get_ticks()
+    def scatter(self,bullets):
+        direction=random.choice((-1,1))
+        l,h1,h2=self.size
+        phase=random.uniform(l,self.distance)
+        for i in range(0,self.count):
+            bullet=bullet_types.ArrowBullet1(self.v,math.pi if direction==1 else 0,phase+self.distance*i,self.y,l,h1,h2,lifetime=self.lifetime)
+            bullets.append(bullet)
+            self.bullets.append([0,bullet])
+    def relocate(self,bullets):
+        l,h1,h2=self.size
+        for bullet in self.bullets:
+            #print(bullet[0])
+            if bullet[1].y+bullet[1].h2>HEIGHT and bullet[1].an==math.pi:
+                bullet[0]+=1
+                if bullet[0]>self.max_relocations:
+                    self.bullets.remove(bullet)
+                else:   
+                    n_bullet=bullet_types.ArrowBullet1(bullet[1].v,bullet[1].an,bullet[1].x,bullet[1].y-HEIGHT,l,h1,h2,lifetime=self.lifetime)
+                    bullets.append(n_bullet)
+                    bullet[1]=n_bullet
+            elif bullet[1].y-bullet[1].h2<0 and bullet[1].an==0:
+                bullet[0]+=1
+                if bullet[0]>self.max_relocations:
+                    self.bullets.remove(bullet)
+                else:   
+                    n_bullet=bullet_types.ArrowBullet1(bullet[1].v,bullet[1].an,bullet[1].x,bullet[1].y+HEIGHT,l,h1,h2,lifetime=self.lifetime)
+                    bullets.append(n_bullet)
+                    bullet[1]=n_bullet
+    def clear(self,bullets):
+        pass
+    
 class SpellCard1:
     def __init__(self,gun,x,y):#,bullets):
         self.x=x
@@ -363,7 +437,7 @@ class SpellCard3:
         self.standart_r=WIDTH/2
         self.r=self.standart_r
         self.exist=False
-        self.speed=16
+        self.speed=10
         self.narrowing_speed=0.01
         self.bullets=[]
         self.creation_period=50

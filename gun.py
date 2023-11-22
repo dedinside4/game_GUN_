@@ -54,18 +54,14 @@ class Ball:
         # FIXME
         self.x += self.vx
         self.y += self.vy
-        if self.x>WIDTH - self.r:
+        if self.x>=WIDTH - self.r:
             self.x = WIDTH - self.r
             self.vx*=-(1-self.speed_loss)
             self.vy*=1-self.speed_loss*0.2
-            if abs(self.vx)<0.5:
-                self.vx=0
-        if self.x<self.r:
+        elif self.x<=self.r:
             self.x = self.r
             self.vx*=-(1-self.speed_loss)
             self.vy*=1-self.speed_loss*0.2
-            if abs(self.vx)<0.5:
-                self.vx=0
         if self.y>=HEIGHT - self.r:
             self.y = HEIGHT - self.r
             self.vy*=-(1-self.speed_loss)
@@ -73,15 +69,12 @@ class Ball:
             if abs(self.vy)<0.5 and self.gy<0:
                 self.vy=0
                 self.gy=0
-                self.killtime=pygame.time.get_ticks()
-        if self.y<self.r:
+        elif self.y<=self.r:
             self.y = self.r
             self.vy*=-(1-self.speed_loss)
             self.vx*=1-self.speed_loss*0.2
-            if abs(self.vy)<0.5:
-                self.killtime=pygame.time.get_ticks()
-                self.vy=0
-                self.gy=0
+        if abs(self.vx)<0.5:
+                self.vx=0
         self.vy -= self.gy
     def draw(self):
         pygame.draw.circle(
@@ -106,10 +99,11 @@ class Ball:
                 collision=True
         except:
             x,y,w,h=obj
-            collision=self.x>=x and self.x<=x+w and self.y>=y and self.y<=self.y+h
+            collision=(self.x>=x and self.x<=x+w and self.y>=y and self.y<=y+h)
         return collision
     def do_you_want_to_die(self):
-        if pygame.time.get_ticks()-self.killtime>=100:
+        #print(self.vx,self.vy)
+        if self.vx==0 and self.vy==0:
             balls.remove(self)
 class Stick:
     def __init__ (self,x,y,an,v,v1):
@@ -228,14 +222,14 @@ class Gun:
         self.v2 = self.v1*0.4
         self.v = 0
         self.tank_color = GREY
-        self.live=7
+        self.live=5
         self.cooldown=False
         self.cooldown_time=5000
         self.last_shot=-230000
         self.invincible=False
         self.got_invincible=pygame.time.get_ticks()
         self.invincible_time=4000
-        self.continues=0
+        self.continues=3
         self.b=float(root_scalar(self.find_ellipse, bracket=[0, self.left]).root)
         self.hitbox=None
         self.fire_type=None
@@ -326,7 +320,7 @@ class Gun:
             self.color = RED
     def draw(self):
         # FIXIT don't know how to do it
-        if not self.invincible or self.bombing:
+        if not self.invincible:
             self.get_rect()
             pygame.draw.ellipse(screen, self.tank_color, self.rect)
             pygame.draw.line(screen, self.color, (self.x,self.y),(self.x+math.sin(self.an)*self.f2_power,self.y-math.cos(self.an)*self.f2_power), width=5)
@@ -368,7 +362,6 @@ class Gun:
     def deadend(self):
         if self.continues>0:
             offer_continue()
-            self.continues-=1
         else:
             game_over()
     def move(self):
@@ -419,6 +412,8 @@ class Dora(Gun):
         self.max_cooldown=7000
         self.cooldown_time=self.min_cooldown
         self.deployed=False
+        self.invincible=False
+        self.invincible_time=6000
     def draw(self):
         # FIXIT don't know how to do it
         if not self.invincible or ((pygame.time.get_ticks()-self.got_invincible)//150)%2==0:
@@ -450,7 +445,7 @@ class Dora(Gun):
         dead=False
         if not self.invincible:
             for ball in balls:
-                if ball.hittest((self.x-self.left,self.y-5,2*self.left,self.bottom+10)) or (self.x+self.left>WIDTH and ball.hittest((self.x-WIDTH-self.left,self.y,2*self.left,self.bottom))) or ( self.x-self.left<0 and ball.hittest((self.x+WIDTH-self.left,self.y,2*self.left,self.bottom))):
+                if ball.hittest((self.x-self.left,self.y,2*self.left,self.bottom)) or (self.x+self.left>WIDTH and ball.hittest((self.x-WIDTH-self.left,self.y,2*self.left,self.bottom))) or ( self.x-self.left<0 and ball.hittest((self.x+WIDTH-self.left,self.y,2*self.left,self.bottom))):
                     self.live-=1
                     print(self.live)
                     self.invincible=True
@@ -459,6 +454,7 @@ class Dora(Gun):
                         dead=True
                         self.dead_end()
                     play_death_sound()
+                    break
         return dead
     def dead_end(self):
         global railguns
@@ -493,7 +489,7 @@ class Dora(Gun):
         if self.f2_on:
             if self.f2_power < WIDTH/10:
                 self.f2_power += WIDTH/(60*FPS*1)
-            if self.f2_power>=WIDTH/10 and abs(self.x-WIDTH/2)<=WIDTH/5:
+            if self.f2_power>=WIDTH/10 and abs(self.x-WIDTH/2)<=2*WIDTH/5:
                 shell=self.fire_end()
             self.color = RED
         return shell
@@ -553,6 +549,7 @@ class EvilGun(Gun):
                         dead=True
                         self.dead_end()
                     play_death_sound()
+                    break
         return dead
     def dead_end(self):
         global evilgun
@@ -636,9 +633,9 @@ class Target:
         """ Инициализация новой цели."""
         self.x = rnd(600, 780)
         self.y = rnd(300, 550)
-        self.r = rnd(46, 50)#self.r = rnd(2, 50)
-        self.vx = rnd(0,0)#self.vx = rnd(-5,5)
-        self.vy = rnd(0,0)#self.vy = rnd(-5,5)
+        self.r = rnd(2, 50)
+        self.vx = rnd(-5,5)
+        self.vy = rnd(-5,5)
         self.color = RED
         self.points = 0
         self.live = 1
@@ -661,7 +658,11 @@ class Target:
     def hit(self,ball ,points=1):
         """Попадание шарика в цель."""
         self.points += points
-        self.live-=1
+        self.live-=1        
+    def hit_tank(self):
+        rect=pygame.Rect(self.x-self.r/math.sqrt(2),self.y-self.r/math.sqrt(2),2*self.r/math.sqrt(2),2*self.r/math.sqrt(2))
+        if rect.colliderect(gun.hitbox):
+            gun.get_hit()
     def draw(self):
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.r)
     def attack(self):
@@ -710,9 +711,11 @@ class Boss:
             exec('self.'+self.pull[self.order]+'()')
             self.order+=1
         except Exception as e:
-            #self.live=0
+            self.live=0
             print(e)
-class Boss2(Boss):
+    def hit_tank(self):
+        pass
+class Boss1(Boss):
     def __init__(self,x=WIDTH/2,y=HEIGHT*1/5,r=WIDTH/10):
         Boss.__init__(self,x,y,r)
         self.pull=['attack_1','spellcard_1','attack_2','spellcard_2']
@@ -747,21 +750,31 @@ class Boss2(Boss):
         evilgun=EvilGun(screen,self.x,self.y)
         self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.4,6,(WIDTH/40,WIDTH/30,WIDTH/80),gun))
         self.attack_patterns.append(spellcards.SpellCard2(evilgun))    
-class Boss1(Boss):
+class Boss2(Boss):
     def __init__(self,x=WIDTH/2,y=HEIGHT*1/5,r=WIDTH/10):
         Boss.__init__(self,x,y,r)
-        self.pull=['spellcard_3','spellcard_2','spellcard_1','spellcard_4']
+        self.pull=['attack_1','spellcard_1','attack_2','spellcard_2','spellcard_3']#,'spellcard_4']
         self.order=0
         self.attack_patterns=[]
         self.name='Ball 2'
         self.spell_name=''
+    def attack_1(self):
+        self.attack_patterns=[]
+        self.live=70
+        self.max_live=70
+        self.attack_patterns.append(spellcards.AttackPattern4(self.x,self.y,0.2,33,3,(WIDTH/90,WIDTH/80,WIDTH/30)))
     def spellcard_1(self):
         self.attack_patterns=[]
         self.spell_name='Inviolable Border'
         self.live=70
         self.max_live=70
-        self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.7,7,(WIDTH/60,WIDTH/30,WIDTH/80),gun))
+        self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.7,7,(WIDTH/60,WIDTH/80,WIDTH/30),gun))
         self.attack_patterns.append(spellcards.SpellCard3(gun))
+    def attack_2(self):
+        self.attack_patterns=[]
+        self.live=70
+        self.max_live=70
+        self.attack_patterns.append(spellcards.AttackPattern5(2*HEIGHT/5,2.3,6,4,(WIDTH/90,WIDTH/80,WIDTH/30)))
     def spellcard_2(self):
         self.attack_patterns=[]
         self.spell_name='Anomaly: Rotated Space'
@@ -771,7 +784,7 @@ class Boss1(Boss):
     def spellcard_3(self):
         global railguns
         self.attack_patterns=[]
-        self.spell_name='Dora, The Ultimate Railway Gun'
+        self.spell_name="Railway Guns' Shelling"
         self.live=110
         self.max_live=110
         for i in range(0,5):
@@ -780,30 +793,41 @@ class Boss1(Boss):
 class StickShotSound:
     def __init__(self,sounds):
         self.sound=pygame.mixer.Sound('railgun_shot.mp3')
-        self.sound.play()
         sounds.append(self)
         self.created=pygame.time.get_ticks()
+        self.playing=False
     def fadeout(self,sounds):
         if pygame.time.get_ticks()-self.created>=2500:
             self.sound.fadeout(4000)
             sounds.remove(self)
+    def play(self):
+        self.sound.play()
+        self.playing=True
 class NormalShotSound:
-    def __init__(self):
+    def __init__(self,sounds):
         self.sound=pygame.mixer.Sound('normal_shot.mp3')
         self.sound.set_volume(0.8)
+        sounds.append(self)
+        self.created=pygame.time.get_ticks()
+        self.playing=False
+    def fadeout(self,sounds):
+        pass
+    def play(self):
         self.sound.play()
-    #def fadeout(self,sounds):
-        #pass
+        self.playing=True
 class DeathSound:
     def __init__(self,sounds):
         self.sound=pygame.mixer.Sound('tank_explosion.mp3')
-        self.sound.play()
         sounds.append(self)
         self.created=pygame.time.get_ticks()
+        self.playing=False
     def fadeout(self,sounds):
         if pygame.time.get_ticks()-self.created>=500:
             self.sound.fadeout(2000)
             sounds.remove(self)
+    def play(self):
+        self.sound.play()
+        self.playing=True
     
 def next_boss(number):
     try:
@@ -821,6 +845,7 @@ def draw_lives():
     for i in range(gun.live-1,8):
         pygame.draw.circle(screen, BLACK, (WIDTH-WIDTH/7-7*WIDTH/80+i*WIDTH/40,HEIGHT/14), WIDTH/90)
     #draw_text('Lives', (WIDTH-WIDTH/7,HEIGHT/30), WIDTH//30, BLACK)
+    #draw_text(str(fps), (WIDTH-WIDTH/7,HEIGHT/30), WIDTH//30, BLACK)
 def draw_bombs():
     for i in range(0,gun.spellcard_count):
         pygame.draw.circle(screen, GREEN, (WIDTH-WIDTH/7-7*WIDTH/80+i*WIDTH/40,HEIGHT/10), WIDTH/90)
@@ -850,7 +875,35 @@ def play_stick_shot():
     global sounds
     sound=StickShotSound(sounds)
 def play_normal_shot():
-    sound=NormalShotSound()
+    global sounds
+    sound=NormalShotSound(sounds)
+def offer_continue():
+    global afterpause
+    print('paused')
+    global finished
+    paused=True
+    afterpause=True
+    screen.fill(WHITE)
+    draw_text(f"Continue? ({gun.continues} left)",(WIDTH/2,HEIGHT/2),WIDTH//10,BLACK)
+    draw_text("y/n",(WIDTH/2,4*HEIGHT/7),WIDTH//30,BLACK)
+    pygame.display.update()
+    for channel in channels:
+        channel.pause()
+    while paused:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                finished = True
+                paused=False
+            elif event.type == pygame.KEYDOWN:
+                if event.key==pygame.K_y:
+                    paused=False
+                    gun.continues-=1
+                    gun.live=7
+                    for channel in channels:
+                        channel.unpause()
+                elif event.key==pygame.K_n:
+                    paused=False
+                    game_over()
 def game_over():
     global finished
     screen.fill(BLACK)
@@ -859,9 +912,11 @@ def game_over():
     pygame.time.delay(1000)
     finished=True
 def pause():
+    global afterpause
     print('paused')
     global finished
     paused=True
+    afterpause=True
     screen.fill(BLACK)
     pygame.display.update()
     for channel in channels:
@@ -875,6 +930,7 @@ def pause():
                 paused=False
     for channel in channels:
         channel.unpause()
+    
 pygame.init()
 pygame.mixer.init()
 #print(pygame.mixer.get_num_channels())
@@ -902,9 +958,11 @@ evilgun=None
 railguns=[]
 total_count = 0
 shot_count = 0
-next1=0
+level=1
+fps=clock.get_fps()
 boss_number=1
 afterpause=False
+last_played=pygame.time.get_ticks()
 while not finished:
     screen.fill(WHITE)
     gun.draw()
@@ -922,7 +980,7 @@ while not finished:
             done=False
         if type(target)==type(eval(f'Boss{boss_number}()')):
             draw_health_bar(target)
-            draw_text(target.spell_name, (WIDTH-WIDTH/7,HEIGHT/30), WIDTH//30, BLACK)
+            draw_text(target.spell_name, (WIDTH-WIDTH/7,HEIGHT/70), WIDTH//43, BLACK)
     for bullet in bullets:
         bullet.draw(screen)
     for b in balls:
@@ -941,17 +999,24 @@ while not finished:
     for sound in sounds:
         #print(type(sound),type(sounds))
         sound.fadeout(sounds)
+        if pygame.time.get_ticks()-last_played>=110 and not sound.playing:
+            last_played=pygame.time.get_ticks()
+            sound.play()
+            break
     if done:
         #end_music()
         balls = []
+        gun.bombing=False
         draw_text(f'Вы уничтожили цель за {shot_count} выстрелов!',(WIDTH/2,HEIGHT/2),WIDTH//39)
         shot_count = 0
         pygame.display.update()
         pygame.time.delay(1000)
         done=False
-        if next1%2==0:
+        level+=1
+        if level%5==0:
             next_boss(boss_number)
-            next1+=1
+        elif level==11:
+            game_over()
         else:
             for target in targets:
                 if type(target) is type(eval(f'Boss{boss_number}()')):
@@ -959,8 +1024,8 @@ while not finished:
                     targets.remove(target)
                 else:
                     target.new_target()
-            next1+=1
     clock.tick_busy_loop(FPS)
+    fps=clock.get_fps()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             finished = True
@@ -976,10 +1041,11 @@ while not finished:
             elif event.key==pygame.K_ESCAPE:
                 pygame.time.delay(40)
                 pause()
-                afterpause=True
     if not afterpause:        
         for target in targets:
             target.move()
+            if target.live:
+                target.hit_tank()
             target.attack()
             for b in balls:
                 if b.hittest((target.x,target.y,target.r)) and target.live:
