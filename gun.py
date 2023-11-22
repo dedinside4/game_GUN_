@@ -745,10 +745,10 @@ class Boss1(Boss):
         global evilgun
         self.attack_patterns=[]
         self.spell_name='The Tank Has Landed'
-        self.live=70
-        self.max_live=70
+        self.live=110
+        self.max_live=110
         evilgun=EvilGun(screen,self.x,self.y)
-        #self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.4,6,(WIDTH/40,WIDTH/30,WIDTH/80),gun))
+        self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.4,6,(WIDTH/40,WIDTH/30,WIDTH/80),gun))
         self.attack_patterns.append(spellcards.SpellCard2(evilgun))    
 class Boss2(Boss):
     def __init__(self,x=WIDTH/2,y=HEIGHT*1/5,r=WIDTH/10):
@@ -1071,6 +1071,7 @@ while not finished:
                 if target.max_live>1:
                     boss_number+=1
                     targets.remove(target)
+                    pygame.mixer.music.stop()
                 else:
                     target.new_target()
     clock.tick_busy_loop(FPS)
