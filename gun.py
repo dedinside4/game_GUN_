@@ -432,12 +432,11 @@ class Dora(Gun):
         #print(self.x,self.v)
         self.x+=self.v
         if self.deployed:
-            if self.x<0 :
+            if self.x<=0 :
                 self.x=WIDTH+self.x
-            elif self.x>WIDTH:
+            elif self.x>=WIDTH:
                 self.x=WIDTH-self.x
-        else:
-            if self.x-self.left>0 and self.x+self.left<WIDTH:
+        elif self.x-self.left>0 and self.x+self.left<WIDTH:
                 self.deployed=True
     def get_hit(self):
         if pygame.time.get_ticks()-self.got_invincible>=self.invincible_time:
@@ -633,16 +632,18 @@ class Target:
         """ Инициализация новой цели."""
         self.x = rnd(600, 780)
         self.y = rnd(300, 550)
-        self.r = rnd(2, 50)
+        self.r = rnd(10, 50)
         self.vx = rnd(-5,5)
         self.vy = rnd(-5,5)
         self.color = RED
         self.points = 0
         self.live = 1
-        
+        self.move_pattern=random.choice((1,2,3))
+        self.destination=(self.x,self.y)
     def move(self):
         self.x += self.vx
         self.y += self.vy
+        exec(f'self.move_{self.move_pattern}()')
         if self.x>WIDTH - self.r:
             self.x = WIDTH - self.r
             self.vx*=-1
@@ -655,6 +656,27 @@ class Target:
         if self.y<self.r:
             self.y = self.r
             self.vy*=-1
+    def move_1(self):
+        pass
+    def move_2(self):
+        x=WIDTH/2
+        y=HEIGHT/2
+        try:
+            an = math.atan2((x - self.x), (self.y - y))
+        except:
+            an = -math.pi/2
+        a=0.3*random.random()
+        self.vx+=a*math.sin(an)
+        self.vy-=a*math.cos(an)
+    def move_3(self):
+        x,y=self.destination
+        max_range=300
+        if (self.x-x)**2+(self.y-y)**2<=self.r**2:
+            x=random.uniform(max(self.r,self.x-max_range),min(WIDTH-self.r,self.x+max_range))
+            y=random.uniform(max(self.r,self.y-max_range),min(HEIGHT-self.r,self.y+max_range))
+            self.vx=(x-self.x)/(700/1000*120)
+            self.vy=(y-self.y)/(700/1000*120)
+            self.destination=(x,y)
     def hit(self,ball ,points=1):
         """Попадание шарика в цель."""
         self.points += points
@@ -917,7 +939,7 @@ def offer_continue():
     pygame.mixer.music.unpause()
 def game_over():
     global finished
-    pygame.music.stop()
+    pygame.mixer.music.stop()
     screen.fill(BLACK)
     draw_text("GAME OVER",(WIDTH/2,HEIGHT/2),WIDTH//10,RED)
     pygame.display.update()
@@ -988,7 +1010,7 @@ bullet = 0
 balls = []
 bullets = []
 targets = []
-boss_music = ['sounds/the_rabbit_has_landed.wav']
+boss_music = ['sounds/the_rabbit_has_landed.wav','sounds/necrofantasia.wav']
 boss = 6*[(WIDTH/2,HEIGHT*1/5,WIDTH/10)]
 clock = pygame.time.Clock()
 explosion_waves=[]
@@ -1009,7 +1031,7 @@ boss_number=1
 afterpause=False
 last_played=pygame.time.get_ticks()
 sound_volume=1
-music_volume=0.2
+music_volume=0
 while not finished:
     screen.fill(WHITE)
     gun.draw()
