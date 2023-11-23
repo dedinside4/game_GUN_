@@ -511,7 +511,7 @@ class EvilGun(Gun):
                 self.landed=True
     def get_hit_tank(self):
         dead=False
-        if gun.x-gun.left>=self.x-self.left and gun.x-gun.left<=self.x+self.left:
+        if gun.x-gun.left>=self.x-self.left and gun.x-gun.left<=self.x+self.left and self.y+self.bottom>=gun.y:
             gun.get_hit()
             if not self.invincible:
                 self.live-=1
@@ -522,7 +522,7 @@ class EvilGun(Gun):
                     self.dead_end()
                 play_death_sound()
             gun.x=self.x+self.left+gun.left
-        elif gun.x+gun.left<=self.x+self.left and gun.x+gun.left>=self.x-self.left:
+        elif gun.x+gun.left<=self.x+self.left and gun.x+gun.left>=self.x-self.left and self.y+self.bottom>=gun.y:
             gun.get_hit()
             if not self.invincible:
                 self.live-=1
@@ -767,8 +767,8 @@ class Boss1(Boss):
         global evilgun
         self.attack_patterns=[]
         self.spell_name='The Tank Has Landed'
-        self.live=110
-        self.max_live=110
+        self.live=85
+        self.max_live=85
         evilgun=EvilGun(screen,self.x,self.y)
         self.attack_patterns.append(spellcards.AttackPattern2(self.x,self.y,0.4,6,(WIDTH/40,WIDTH/30,WIDTH/80),gun))
         self.attack_patterns.append(spellcards.SpellCard2(evilgun))    
